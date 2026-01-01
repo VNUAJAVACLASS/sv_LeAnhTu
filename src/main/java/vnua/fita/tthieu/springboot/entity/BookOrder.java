@@ -1,5 +1,6 @@
 package vnua.fita.tthieu.springboot.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 @Entity
@@ -10,79 +11,34 @@ public class BookOrder {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Quan hệ với OrderStatus
     @ManyToOne
+    @JsonIgnore // Tránh vòng lặp JSON
     @JoinColumn(name = "order_id", nullable = false)
-    private OrderStatus order; 
+    private OrderStatus order;
 
-    // Quan hệ với Book
     @ManyToOne
     @JoinColumn(name = "book_id", nullable = false)
     private Book book;
 
-    // Số lượng sách trong đơn hàng
     @Column(nullable = false)
-    private Integer soLuong;
+    private Integer soLuong; // Bắt buộc set khi tạo
 
-    // Giá tại thời điểm đặt (không bị ảnh hưởng khi admin sửa giá sách)
     @Column(nullable = false)
-    private Double giaTaiThoiDiem;
+    private Double giaTaiThoiDiem; // Giá tại thời điểm đặt
 
-    // ===== Constructors =====
-    
-    public BookOrder() {}
-
-    public BookOrder(OrderStatus order, Book book, Integer soLuong, Double giaTaiThoiDiem) {
-        this.order = order;
-        this.book = book;
-        this.soLuong = soLuong;
-        this.giaTaiThoiDiem = giaTaiThoiDiem;
+    // ===== Helper =====
+    public Double getTongTien() {
+        return soLuong * giaTaiThoiDiem;
     }
 
     // ===== Getters & Setters =====
-    
-    public Long getId() {
-        return id;
-    }
-
-    public OrderStatus getOrder() {
-        return order;
-    }
-
-    public void setOrder(OrderStatus order) {
-        this.order = order;
-    }
-
-    public Book getBook() {
-        return book;
-    }
-
-    public void setBook(Book book) {
-        this.book = book;
-    }
-
-    public Integer getSoLuong() {
-        return soLuong;
-    }
-
-    public void setSoLuong(Integer soLuong) {
-        this.soLuong = soLuong;
-    }
-
-    public Double getGiaTaiThoiDiem() {
-        return giaTaiThoiDiem;
-    }
-
-    public void setGiaTaiThoiDiem(Double giaTaiThoiDiem) {
-        this.giaTaiThoiDiem = giaTaiThoiDiem;
-    }
-
-    // ===== Helper Methods =====
-    
-    /**
-     * Tính tổng tiền của book order này
-     */
-    public Double getTongTien() {
-        return giaTaiThoiDiem * soLuong;
-    }
+    public Long getId() { return id; }
+    public OrderStatus getOrder() { return order; }
+    public void setOrder(OrderStatus order) { this.order = order; }
+    public Book getBook() { return book; }
+    public void setBook(Book book) { this.book = book; }
+    public Integer getSoLuong() { return soLuong; }
+    public void setSoLuong(Integer soLuong) { this.soLuong = soLuong; }
+    public Double getGiaTaiThoiDiem() { return giaTaiThoiDiem; }
+    public void setGiaTaiThoiDiem(Double giaTaiThoiDiem) { this.giaTaiThoiDiem = giaTaiThoiDiem; }
 }

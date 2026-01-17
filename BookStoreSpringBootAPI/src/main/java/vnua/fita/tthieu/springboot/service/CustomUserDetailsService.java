@@ -35,7 +35,11 @@ public class CustomUserDetailsService implements UserDetailsService {
         // có kiểu Collection <? extends GrantedAuthority> do đó cần chuyển
         // roles thành SimpleGrantedAuthority (là lớp extends của GrantedAuthority)
         var authorities = user.getRoles().stream()
-                .map(role -> new SimpleGrantedAuthority(role.getName())) // truyền hàm mũi tên vào map
+        		.map(role -> new SimpleGrantedAuthority(
+        			    role.getName().startsWith("ROLE_")
+        			        ? role.getName()
+        			        : "ROLE_" + role.getName()
+        			)) // truyền hàm mũi tên vào map
                 .collect(Collectors.toList()); // gom về dạng List
         
         // Lớp User này trong thư viện spring implements interface UserDetails nên có thể dùng return

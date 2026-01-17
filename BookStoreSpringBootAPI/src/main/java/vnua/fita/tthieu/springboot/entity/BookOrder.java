@@ -17,8 +17,9 @@ public class BookOrder {
     private OrderStatus order;
 
     @ManyToOne
-    @JoinColumn(name = "book_id", nullable = false)
+    @JoinColumn(name = "book_id", nullable = true)
     private Book book;
+
 
     @Column(nullable = false)
     private Integer soLuong; // Bắt buộc set khi tạo

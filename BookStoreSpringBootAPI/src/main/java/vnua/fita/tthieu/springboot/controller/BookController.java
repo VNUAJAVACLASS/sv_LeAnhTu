@@ -33,15 +33,19 @@ public class BookController {
     // Các phần response header, status để SpringBoot tự xử lý dựa vào ngữ cảnh
     // role user thường chỉ được quyền tạo, không được quyền sửa, xóa
     @PostMapping
-    @PreAuthorize("hasRole('ROLE_USER') or hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
+
     public Book createBook(@RequestBody Book book) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         book.setCreatedBy(username);
+        System.out.println(SecurityContextHolder.getContext()
+                .getAuthentication().getAuthorities());
+        
         return bookService.save(book);
     }
     
     @PatchMapping("/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public Book updateBook(@PathVariable Long id, @RequestBody Book updatedBook) {
         // Ghi vào CSDL: account admin nào thực hiện update
     	String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -49,7 +53,7 @@ public class BookController {
     }
     
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public void deleteBook(@PathVariable Long id) {
         bookService.delete(id);
     }

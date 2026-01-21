@@ -87,7 +87,7 @@ public class SecurityConfig {
     @Bean 
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5174")); // cho phép ứng dụng VueJS truy cập API
+        configuration.setAllowedOrigins(List.of("http://localhost:5173")); // cho phép ứng dụng VueJS truy cập API
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         //configuration.setAllowCredentials(true); // nếu cần

@@ -1,18 +1,14 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-
 import AppHeader from '@/components/common/AppHeader.vue'
 import AppFooter from '@/components/common/AppFooter.vue'
 
 const route = useRoute()
 
-/**
- * Ẩn Header / Footer ở trang login & register
- * (thực tế dự án hay làm vậy)
- */
+// Ẩn Header / Footer ở trang register và login
 const showLayout = computed(() => {
-  return !['/login', '/register'].includes(route.path)
+  return route.path !== '/register' && route.path !== '/login'
 })
 </script>
 
@@ -22,7 +18,7 @@ const showLayout = computed(() => {
     <AppHeader v-if="showLayout" />
 
     <!-- MAIN CONTENT -->
-    <main class="min-h-screen">
+    <main :class="{ 'full-page': !showLayout }">
       <router-view />
     </main>
 
@@ -31,7 +27,18 @@ const showLayout = computed(() => {
   </div>
 </template>
 
-<style scoped>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f5f5f5;
+}
+
 .app-container {
   display: flex;
   flex-direction: column;
@@ -40,7 +47,13 @@ const showLayout = computed(() => {
 
 main {
   flex: 1;
-  padding: 16px;
+  padding: 20px;
   background-color: #f8f9fa;
+  padding-bottom: 80px; /* Dành chỗ cho footer */
+}
+
+main.full-page {
+  padding: 0;
+  padding-bottom: 0;
 }
 </style>

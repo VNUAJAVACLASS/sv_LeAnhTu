@@ -1,10 +1,15 @@
 package vnua.fita.tthieu.springboot.controller;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import vnua.fita.tthieu.springboot.entity.Role;
@@ -73,4 +78,34 @@ public class UserController {
         user.setRoles(newRoles);
         return userRepository.save(user);
     }
+    
+    //Trang cá nhân
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getCurrentUser() {
+        // Lấy username từ SecurityContext
+        String username = SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getName();
+        
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+        
+        // Tạo response DTO (không trả password)
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", user.getId());
+        response.put("username", user.getUsername());
+        response.put("gmail", user.getGmail());
+        response.put("soDienThoai", user.getSoDienThoai());
+        response.put("diaChi", user.getDiaChi());
+        
+        // Chuyển roles thành List<String>
+        List<String> roles = user.getRoles().stream()
+                .map(Role::getName)
+                .collect(Collectors.toList());
+        response.put("roles", roles);
+        
+        return ResponseEntity.ok(response);
+    }
+    
 }

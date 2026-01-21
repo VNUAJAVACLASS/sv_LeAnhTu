@@ -1,107 +1,66 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import api from '@/api/axios'
-import Swal from 'sweetalert2'
+import { useAuthStore } from '@/stores/auth.store'
 
 const router = useRouter()
+const auth = useAuthStore()
 
 const username = ref('')
 const password = ref('')
-const confirmPassword = ref('')
 const error = ref('')
-const isSubmitting = ref(false)
 
 const submit = async () => {
-  // Validate
-  if (!username.value || !password.value || !confirmPassword.value) {
-    error.value = 'Vui lòng điền đầy đủ thông tin'
-    return
-  }
-
-  if (password.value !== confirmPassword.value) {
-    error.value = 'Mật khẩu xác nhận không khớp'
-    return
-  }
-
-  if (password.value.length < 6) {
-    error.value = 'Mật khẩu phải có ít nhất 6 ký tự'
-    return
-  }
-
   try {
-    isSubmitting.value = true
     error.value = ''
-
-    await api.post('/auth/register', {
-      username: username.value,
-      password: password.value
-    })
-
-    await Swal.fire({
-      icon: 'success',
-      title: 'Đăng ký thành công!',
-      text: 'Hãy đăng nhập để vào hệ thống!',
-      confirmButtonText: 'OK'
-    })
-
-    router.push('/login')
-  } catch (e) {
-    if (e.response?.data) {
-      error.value = e.response.data
+    await auth.login(username.value, password.value)
+    
+    // Kiểm tra role sau khi login
+    if (auth.isAdmin) {
+      router.push('/admin') // Admin vào trang quản lý
     } else {
-      error.value = 'Đăng ký thất bại. Vui lòng thử lại!'
+      router.push('/') // User vào trang chủ
     }
-  } finally {
-    isSubmitting.value = false
+  } catch (e) {
+    error.value = 'Sai tài khoản hoặc mật khẩu'
   }
 }
 </script>
 
 <template>
-  <div class="register-page">
+  <div class="login-page">
     <div class="auth-box">
-      <h2>📝 Đăng ký tài khoản</h2>
+      <h2>🔐 Đăng nhập</h2>
 
       <div class="form-group">
         <label>Tên đăng nhập:</label>
-        <input
-          v-model="username"
+        <input 
+          v-model="username" 
           type="text"
-          placeholder="Nhập username"
+          placeholder="Nhập username" 
           @keyup.enter="submit"
         />
       </div>
 
       <div class="form-group">
         <label>Mật khẩu:</label>
-        <input
-          v-model="password"
-          type="password"
-          placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)"
+        <input 
+          v-model="password" 
+          type="password" 
+          placeholder="Nhập mật khẩu"
           @keyup.enter="submit"
         />
       </div>
 
-      <div class="form-group">
-        <label>Xác nhận mật khẩu:</label>
-        <input
-          v-model="confirmPassword"
-          type="password"
-          placeholder="Nhập lại mật khẩu"
-          @keyup.enter="submit"
-        />
-      </div>
-
-      <button @click="submit" class="btn-register" :disabled="isSubmitting">
-        {{ isSubmitting ? 'Đang đăng ký...' : 'Đăng ký' }}
+      <button @click="submit" class="btn-login" :disabled="loading">
+        {{ loading ? 'Đang đăng nhập...' : 'Đăng nhập' }}
       </button>
 
       <p class="error" v-if="error">{{ error }}</p>
 
-      <div class="login-link">
-        <p>Đã có tài khoản?
-          <router-link to="/login">Đăng nhập ngay</router-link>
+      <div class="register-link">
+        <p>Chưa có tài khoản? 
+          <router-link to="/register">Đăng ký ngay</router-link>
         </p>
       </div>
     </div>
@@ -109,7 +68,7 @@ const submit = async () => {
 </template>
 
 <style scoped>
-.register-page {
+.login-page {
   min-height: 80vh;
   display: flex;
   align-items: center;
@@ -158,7 +117,7 @@ const submit = async () => {
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-.btn-register {
+.btn-login {
   width: 100%;
   padding: 14px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -171,14 +130,9 @@ const submit = async () => {
   transition: 0.3s;
 }
 
-.btn-register:hover:not(:disabled) {
+.btn-login:hover {
   transform: translateY(-2px);
   box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
-}
-
-.btn-register:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .error {
@@ -191,19 +145,19 @@ const submit = async () => {
   border-radius: 4px;
 }
 
-.login-link {
+.register-link {
   text-align: center;
   margin-top: 20px;
   color: #7f8c8d;
 }
 
-.login-link a {
+.register-link a {
   color: #667eea;
   text-decoration: none;
   font-weight: 600;
 }
 
-.login-link a:hover {
+.register-link a:hover {
   text-decoration: underline;
 }
 </style>

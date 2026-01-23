@@ -1,28 +1,54 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
+import { useCartStore } from '@/stores/cart.store'
 
 const router = useRouter()
 const auth = useAuthStore()
+const cartStore = useCartStore()
 
 const username = ref('')
 const password = ref('')
 const error = ref('')
+const isSubmitting = ref(false)
+
+const isValid = computed(() => {
+  if (!username.value || !password.value) return false
+  if (password.value.length < 8 || password.value.length > 20) return false
+  return true
+})
 
 const submit = async () => {
+  // Chặn ngay từ frontend
+  if (!username.value || !password.value) {
+    error.value = 'Vui lòng nhập đầy đủ thông tin'
+    return
+  }
+
+  if (password.value.length < 8 || password.value.length > 20) {
+    error.value = 'Mật khẩu phải từ 8 đến 20 ký tự'
+    return
+  }
+
   try {
     error.value = ''
+    isSubmitting.value = true
+
+    // CHỈ TỚI ĐÂY MỚI GỬI BACKEND
     await auth.login(username.value, password.value)
-    
-    // Kiểm tra role sau khi login
+
+    cartStore.initCart()
+
     if (auth.isAdmin) {
-      router.push('/admin') // Admin vào trang quản lý
+      router.push('/admin')
     } else {
-      router.push('/') // User vào trang chủ
+      router.push('/')
     }
   } catch (e) {
     error.value = 'Sai tài khoản hoặc mật khẩu'
+  } finally {
+    isSubmitting.value = false
   }
 }
 </script>
@@ -34,30 +60,37 @@ const submit = async () => {
 
       <div class="form-group">
         <label>Tên đăng nhập:</label>
-        <input 
-          v-model="username" 
+        <input
+          v-model.trim="username"
           type="text"
-          placeholder="Nhập username" 
+          placeholder="Nhập username"
           @keyup.enter="submit"
         />
       </div>
 
       <div class="form-group">
         <label>Mật khẩu:</label>
-        <input 
-          v-model="password" 
-          type="password" 
-          placeholder="Nhập mật khẩu"
+        <input
+          v-model="password"
+          type="password"
+          placeholder="Mật khẩu (8–20 ký tự)"
           @keyup.enter="submit"
         />
       </div>
 
-      <button @click="submit" class="btn-login">Đăng nhập</button>
+      <button
+        class="btn-login"
+        :disabled="!isValid || isSubmitting"
+        @click="submit"
+      >
+        {{ isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập' }}
+      </button>
 
       <p class="error" v-if="error">{{ error }}</p>
 
       <div class="register-link">
-        <p>Chưa có tài khoản? 
+        <p>
+          Chưa có tài khoản?
           <router-link to="/register">Đăng ký ngay</router-link>
         </p>
       </div>
@@ -106,7 +139,6 @@ const submit = async () => {
   border: 1px solid #ddd;
   border-radius: 6px;
   font-size: 14px;
-  transition: 0.3s;
 }
 
 .auth-box input:focus {
@@ -122,21 +154,19 @@ const submit = async () => {
   color: white;
   border: none;
   border-radius: 6px;
-  cursor: pointer;
   font-size: 16px;
   font-weight: 600;
-  transition: 0.3s;
+  cursor: pointer;
 }
 
-.btn-login:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+.btn-login:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .error {
   color: #e74c3c;
   text-align: center;
-  font-size: 14px;
   margin-top: 15px;
   background: #ffe6e6;
   padding: 10px;
@@ -146,16 +176,10 @@ const submit = async () => {
 .register-link {
   text-align: center;
   margin-top: 20px;
-  color: #7f8c8d;
 }
 
 .register-link a {
   color: #667eea;
-  text-decoration: none;
   font-weight: 600;
-}
-
-.register-link a:hover {
-  text-decoration: underline;
 }
 </style>

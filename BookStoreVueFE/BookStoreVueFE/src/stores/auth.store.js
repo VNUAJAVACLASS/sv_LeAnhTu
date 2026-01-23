@@ -20,7 +20,7 @@ export const useAuthStore = defineStore('auth', {
   },
 
   actions: {
-    // ✅ Khởi tạo user từ localStorage khi app load
+    // Khởi tạo user từ localStorage khi app load
     initAuth() {
       const token = localStorage.getItem('token')
       const username = localStorage.getItem('username')
@@ -61,13 +61,11 @@ export const useAuthStore = defineStore('auth', {
 
         // ✅ Cập nhật state ngay lập tức
         this.token = accessToken
-        this.user = { 
-          id: userId, 
-          username: username,  // ✅ Đảm bảo username được set
-          roles: roles 
+        this.user = {
+          id: userId,
+          username: username,
+          roles: roles
         }
-
-        console.log('✅ Login success, user:', this.user) // Debug log
 
         return res.data
       } catch (error) {
@@ -77,6 +75,13 @@ export const useAuthStore = defineStore('auth', {
     },
 
     logout() {
+      const userId = this.user?.id
+
+      // Xóa giỏ hàng của user này
+      if (userId) {
+        localStorage.removeItem(`cart_user_${userId}`)
+      }
+
       // Xóa localStorage
       localStorage.removeItem('token')
       localStorage.removeItem('username')

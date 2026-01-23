@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import ManageBooks from './ManageBooks.vue'
 import ManageUsers from './ManageUsers.vue'
 import ManageOrders from './ManageOrders.vue'
-
+import HistoryOrders from './HistoryOrders.vue'
 const activeTab = ref('books')
 </script>
 
@@ -58,16 +58,13 @@ const activeTab = ref('books')
       </div>
 
       <!-- MAIN CONTENT -->
-      <div class="content">
-        <ManageBooks v-if="activeTab === 'books'" />
-        <ManageUsers v-if="activeTab === 'users'" />
-        <ManageOrders v-if="activeTab === 'orders'" />
-
-        <div v-if="activeTab === 'history'" class="history-section">
-          <h3>📜 Lịch sử giao dịch</h3>
-          <p>Chức năng đang phát triển...</p>
+        <div class="content">
+          <ManageBooks v-if="activeTab === 'books'" />
+          <ManageUsers v-if="activeTab === 'users'" />
+          <ManageOrders v-if="activeTab === 'orders'" />
+          <HistoryOrders v-if="activeTab === 'history'" />
         </div>
-      </div>
+
 
     </div>
   </div>

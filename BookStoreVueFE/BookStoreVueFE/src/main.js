@@ -11,8 +11,9 @@ import 'sweetalert2/dist/sweetalert2.min.css'
 // Import Router
 import router from './router'
 
-// Import Auth Store
+// Import Stores
 import { useAuthStore } from './stores/auth.store'
+import { useCartStore } from './stores/cart.store'
 
 // Axios config
 axios.defaults.baseURL = 'http://localhost:8080/'
@@ -23,8 +24,12 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 
-// ✅ Khởi tạo auth từ localStorage khi app load
+// Khởi tạo auth từ localStorage khi app load
 const authStore = useAuthStore()
 authStore.initAuth()
+
+// Khởi tạo giỏ hàng theo userId sau khi auth đã load
+const cartStore = useCartStore()
+cartStore.initCart()
 
 app.mount('#app')

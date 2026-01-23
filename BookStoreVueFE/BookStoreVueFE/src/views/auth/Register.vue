@@ -13,19 +13,21 @@ const error = ref('')
 const isSubmitting = ref(false)
 
 const submit = async () => {
-  // Validate
+  // Validate thiếu trường
   if (!username.value || !password.value || !confirmPassword.value) {
-    error.value = 'Vui lòng điền đầy đủ thông tin'
+    error.value = 'Vui lòng nhập đầy đủ thông tin'
     return
   }
 
+  // Validate độ dài mật khẩu
+  if (password.value.length < 8 || password.value.length > 20) {
+    error.value = 'Mật khẩu phải từ 8 đến 20 ký tự'
+    return
+  }
+
+  // Validate xác nhận mật khẩu
   if (password.value !== confirmPassword.value) {
     error.value = 'Mật khẩu xác nhận không khớp'
-    return
-  }
-
-  if (password.value.length < 6) {
-    error.value = 'Mật khẩu phải có ít nhất 6 ký tự'
     return
   }
 
@@ -56,6 +58,7 @@ const submit = async () => {
     isSubmitting.value = false
   }
 }
+
 </script>
 
 <template>
@@ -78,7 +81,7 @@ const submit = async () => {
         <input
           v-model="password"
           type="password"
-          placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)"
+          placeholder="Nhập mật khẩu (tối thiểu 8 ký tự)"
           @keyup.enter="submit"
         />
       </div>

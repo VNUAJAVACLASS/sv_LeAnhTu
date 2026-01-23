@@ -62,6 +62,7 @@ const username = computed(() => authStore.user?.username || '')
 
 const logout = () => {
   authStore.logout()
+  cartStore.clearCart() //Xóa giỏ hàng khi logout
   router.push('/')
 }
 </script>

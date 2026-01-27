@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -79,19 +80,104 @@ public class AuthController {
 	}
 
 	@PostMapping("/register")
-	public User register(@RequestBody RegisterRequest req) {
-		// kiểm tra user tồn tại
-		if (userRepo.findByUsername(req.getUsername()).isPresent()) {
-			throw new RuntimeException("Username đã tồn tại");
-		}
-		User user = new User();
-		user.setUsername(req.getUsername());
-		user.setPassword(passwordEncoder.encode(req.getPassword()));
+	public ResponseEntity<?> register(@RequestBody RegisterRequest req) {
+	    try {
+	        // ===== VALIDATION =====
+	        
+	        // 1. Kiểm tra username
+	        if (req.getUsername() == null || req.getUsername().trim().isEmpty()) {
+	            return ResponseEntity.badRequest().body("Tên đăng nhập không được để trống");
+	        }
+	        
+	        if (req.getUsername().length() < 3 || req.getUsername().length() > 20) {
+	            return ResponseEntity.badRequest().body("Tên đăng nhập phải từ 3-20 ký tự");
+	        }
 
-		// gán role mặc định (ROLE_USER)
-		Role roleUser = roleRepo.findByName("ROLE_USER").orElseThrow(() -> new RuntimeException("Role không tồn tại"));
-		user.setRoles(Set.of(roleUser));
+	        if (!req.getUsername().matches("^[a-zA-Z0-9_]+$")) {
+	            return ResponseEntity.badRequest().body("Tên đăng nhập chỉ chứa chữ, số và dấu gạch dưới");
+	        }
 
-		return userRepo.save(user);
+	        // Kiểm tra username đã tồn tại
+	        if (userRepo.findByUsername(req.getUsername()).isPresent()) {
+	            return ResponseEntity.badRequest().body("Tên đăng nhập đã tồn tại");
+	        }
+
+	        // 2. Kiểm tra password
+	        if (req.getPassword() == null || req.getPassword().trim().isEmpty()) {
+	            return ResponseEntity.badRequest().body("Mật khẩu không được để trống");
+	        }
+
+	        if (req.getPassword().length() < 5 || req.getPassword().length() > 20) {
+	            return ResponseEntity.badRequest().body("Mật khẩu phải từ 5-20 ký tự");
+	        }
+
+	        // 3. Kiểm tra email
+	        if (req.getGmail() == null || req.getGmail().trim().isEmpty()) {
+	            return ResponseEntity.badRequest().body("Email không được để trống");
+	        }
+
+	        if (!isValidEmail(req.getGmail())) {
+	            return ResponseEntity.badRequest().body("Email không hợp lệ");
+	        }
+
+	        // 4. Kiểm tra số điện thoại
+	        if (req.getSoDienThoai() == null || req.getSoDienThoai().trim().isEmpty()) {
+	            return ResponseEntity.badRequest().body("Số điện thoại không được để trống");
+	        }
+
+	        if (!isValidPhone(req.getSoDienThoai())) {
+	            return ResponseEntity.badRequest().body("Số điện thoại phải có 10-11 chữ số");
+	        }
+
+	        // ===== TẠO USER =====
+	        User user = new User();
+	        user.setUsername(req.getUsername());
+	        user.setPassword(passwordEncoder.encode(req.getPassword()));
+	        
+	        // ✅ LƯU EMAIL VÀ SỐ ĐIỆN THOẠI
+	        user.setGmail(req.getGmail());
+	        user.setSoDienThoai(req.getSoDienThoai());
+
+	        // Gán role mặc định (ROLE_USER)
+	        Role roleUser = roleRepo.findByName("ROLE_USER")
+	                .orElseThrow(() -> new RuntimeException("Role không tồn tại"));
+	        user.setRoles(Set.of(roleUser));
+
+	        User savedUser = userRepo.save(user);
+
+	        // Tạo response
+	        Map<String, Object> response = new HashMap<>();
+	        response.put("id", savedUser.getId());
+	        response.put("username", savedUser.getUsername());
+	        response.put("gmail", savedUser.getGmail());
+	        response.put("soDienThoai", savedUser.getSoDienThoai());
+	        response.put("message", "Đăng ký thành công");
+
+	        return ResponseEntity.ok(response);
+
+	    } catch (Exception e) {
+	        return ResponseEntity.status(500).body("Lỗi server: " + e.getMessage());
+	    }
+	}
+	
+	/**
+	 * Helper: Validate email
+	 */
+	private boolean isValidEmail(String email) {
+	    if (email == null || email.trim().isEmpty()) {
+	        return false;
+	    }
+	    String emailRegex = "^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$";
+	    return email.matches(emailRegex);
+	}
+
+	/**
+	 * Helper: Validate số điện thoại
+	 */
+	private boolean isValidPhone(String phone) {
+	    if (phone == null || phone.trim().isEmpty()) {
+	        return false;
+	    }
+	    return phone.matches("^[0-9]{10,11}$");
 	}
 }

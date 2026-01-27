@@ -38,7 +38,6 @@ const goBack = () => {
 
 <template>
   <div class="detail-container">
-    <button class="back-btn" @click="goBack">⬅ Quay lại</button>
 
     <div v-if="loading">
       <p>Đang tải thông tin sách...</p>

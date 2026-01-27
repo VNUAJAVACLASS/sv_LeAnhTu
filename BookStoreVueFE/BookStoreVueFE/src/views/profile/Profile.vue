@@ -1,9 +1,11 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth.store'
+import { useRouter } from 'vue-router'
 import api from '@/api/axios'
 
 const authStore = useAuthStore()
+const router = useRouter()
 
 const userInfo = ref(null)
 const processingOrders = ref([])
@@ -33,7 +35,10 @@ const loadProcessingOrders = async () => {
   try {
     if (!userId.value) return
     const res = await api.get(`/orders/processing/${userId.value}`)
-    processingOrders.value = res.data
+    
+    processingOrders.value = res.data.filter(order => {
+      return order.trangThai >= 1 && order.trangThai <= 4
+    })
   } catch (error) {
     console.error('Lỗi tải đơn hàng đang xử lý:', error)
   }
@@ -59,6 +64,18 @@ const viewDetail = async (orderId) => {
   } catch (error) {
     console.error('Lỗi tải chi tiết đơn hàng:', error)
   }
+}
+
+const goToChangePassword = () => {
+  router.push('/profile/change-password')
+}
+
+const goToUpdateInfo = () => {
+  router.push('/profile/update-info')
+}
+
+const goToCancelledOrders = () => {
+  router.push('/profile/cancelled-orders')
 }
 
 const handleImageError = (e) => {
@@ -107,15 +124,24 @@ const getStatusClass = (status) => {
   <div class="profile-container">
     <h2>👤 Trang cá nhân</h2>
 
-    <!-- LOADING -->
     <div v-if="loading" class="loading">
       <p>Đang tải dữ liệu...</p>
     </div>
 
     <div v-else>
-      <!-- THÔNG TIN USER -->
       <div class="user-info-card" v-if="userInfo">
-        <h3>📋 Thông tin tài khoản</h3>
+        <div class="card-header-section">
+          <h3>📋 Thông tin tài khoản</h3>
+          <div class="action-buttons">
+            <button @click="goToUpdateInfo" class="btn-action btn-update">
+              <i class="fas fa-edit"></i> Cập nhật thông tin
+            </button>
+            <button @click="goToChangePassword" class="btn-action btn-password">
+              <i class="fas fa-key"></i> Đổi mật khẩu
+            </button>
+          </div>
+        </div>
+
         <div class="info-grid">
           <div class="info-item">
             <strong>ID:</strong>
@@ -133,16 +159,21 @@ const getStatusClass = (status) => {
             <strong>Số điện thoại:</strong>
             <span>{{ userInfo.soDienThoai || 'Chưa cập nhật' }}</span>
           </div>
-          <div class="info-item">
+          <div class="info-item full-width">
             <strong>Địa chỉ:</strong>
             <span>{{ userInfo.diaChi || 'Chưa cập nhật' }}</span>
           </div>
         </div>
       </div>
 
-      <!-- ĐƠN HÀNG ĐANG XỬ LÝ -->
       <div class="orders-section">
-        <h3>📦 Đơn hàng đang xử lý</h3>
+        <div class="section-header">
+          <h3>📦 Đơn hàng đang xử lý</h3>
+          <button @click="goToCancelledOrders" class="btn-view-cancelled">
+            <i class="fas fa-history"></i> Xem đơn đã hủy/trả hàng
+          </button>
+        </div>
+        <p class="section-note">* Chỉ hiển thị đơn hàng đang xử lý (Chờ xác nhận → Đã giao)</p>
 
         <table v-if="processingOrders.length > 0" class="orders-table">
           <thead>
@@ -165,9 +196,7 @@ const getStatusClass = (status) => {
                 </span>
               </td>
               <td>
-                <button @click="viewDetail(order.id)" class="btn-view">
-                  Xem
-                </button>
+                <button @click="viewDetail(order.id)" class="btn-view">Xem</button>
               </td>
             </tr>
           </tbody>
@@ -176,9 +205,9 @@ const getStatusClass = (status) => {
         <p v-else class="empty-message">Không có đơn hàng nào đang xử lý</p>
       </div>
 
-      <!-- LỊCH SỬ MUA HÀNG -->
       <div class="orders-section">
         <h3>📜 Lịch sử mua hàng</h3>
+        <p class="section-note">* Lịch sử các đơn hàng đã giao thành công</p>
 
         <table v-if="orderHistory.length > 0" class="orders-table">
           <thead>
@@ -207,7 +236,6 @@ const getStatusClass = (status) => {
       </div>
     </div>
 
-    <!-- MODAL CHI TIẾT ĐƠN HÀNG -->
     <div v-if="showDetail && selectedOrder" class="modal-overlay" @click.self="showDetail = false">
       <div class="modal-content">
         <div class="modal-header">
@@ -241,9 +269,9 @@ const getStatusClass = (status) => {
               <tr v-for="book in selectedOrder.books" :key="book.bookId">
                 <td>
                   <div class="book-image">
-                    <img 
-                      v-if="book.imagePath" 
-                      :src="`http://localhost:8080${book.imagePath}`" 
+                    <img
+                      v-if="book.imagePath"
+                      :src="`http://localhost:8080${book.imagePath}`"
                       :alt="book.tenSach"
                       @error="handleImageError"
                     />
@@ -292,7 +320,6 @@ const getStatusClass = (status) => {
   color: #7f8c8d;
 }
 
-/* USER INFO CARD */
 .user-info-card {
   background: white;
   padding: 25px;
@@ -301,22 +328,75 @@ const getStatusClass = (status) => {
   margin-bottom: 30px;
 }
 
-.user-info-card h3 {
+.card-header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 20px;
-  color: #2c3e50;
   border-bottom: 2px solid #3498db;
-  padding-bottom: 10px;
+  padding-bottom: 15px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.card-header-section h3 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-action {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-update {
+  background: #3498db;
+  color: white;
+}
+
+.btn-update:hover {
+  background: #2980b9;
+}
+
+.btn-password {
+  background: #e67e22;
+  color: white;
+}
+
+.btn-password:hover {
+  background: #d35400;
 }
 
 .info-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 15px;
 }
 
 .info-item {
   display: flex;
   gap: 10px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.info-item.full-width {
+  grid-column: 1 / -1;
 }
 
 .info-item strong {
@@ -324,7 +404,6 @@ const getStatusClass = (status) => {
   min-width: 140px;
 }
 
-/* ORDERS SECTION */
 .orders-section {
   background: white;
   padding: 25px;
@@ -333,11 +412,53 @@ const getStatusClass = (status) => {
   margin-bottom: 30px;
 }
 
-.orders-section h3 {
-  margin-bottom: 20px;
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.section-header h3 {
+  margin: 0;
   color: #2c3e50;
   border-bottom: 2px solid #27ae60;
   padding-bottom: 10px;
+}
+
+.btn-view-cancelled {
+  padding: 10px 18px;
+  background: #95a5a6;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-view-cancelled:hover {
+  background: #7f8c8d;
+}
+
+.orders-section h3 {
+  margin-bottom: 10px;
+  color: #2c3e50;
+  border-bottom: 2px solid #27ae60;
+  padding-bottom: 10px;
+}
+
+.section-note {
+  font-size: 13px;
+  color: #7f8c8d;
+  font-style: italic;
+  margin-bottom: 15px;
 }
 
 .orders-table {
@@ -426,7 +547,6 @@ const getStatusClass = (status) => {
   font-size: 16px;
 }
 
-/* MODAL */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -517,7 +637,6 @@ const getStatusClass = (status) => {
   background: #f8f9fa;
 }
 
-/* BOOK IMAGE STYLING */
 .book-image {
   width: 60px;
   height: 80px;
@@ -572,5 +691,30 @@ const getStatusClass = (status) => {
 
 .btn-ok:hover {
   background: #2980b9;
+}
+
+@media (max-width: 768px) {
+  .card-header-section {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .action-buttons {
+    width: 100%;
+  }
+
+  .btn-action {
+    flex: 1;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .btn-view-cancelled {
+    width: 100%;
+    justify-content: center;
+  }
 }
 </style>

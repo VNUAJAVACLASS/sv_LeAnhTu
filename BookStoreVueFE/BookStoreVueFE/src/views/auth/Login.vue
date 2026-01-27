@@ -15,7 +15,7 @@ const isSubmitting = ref(false)
 
 const isValid = computed(() => {
   if (!username.value || !password.value) return false
-  if (password.value.length < 8 || password.value.length > 20) return false
+  if (password.value.length < 5 || password.value.length > 20) return false
   return true
 })
 
@@ -26,8 +26,8 @@ const submit = async () => {
     return
   }
 
-  if (password.value.length < 8 || password.value.length > 20) {
-    error.value = 'Mật khẩu phải từ 8 đến 20 ký tự'
+  if (password.value.length < 5 || password.value.length > 20) {
+    error.value = 'Mật khẩu phải từ 5 đến 20 ký tự'
     return
   }
 
@@ -73,7 +73,7 @@ const submit = async () => {
         <input
           v-model="password"
           type="password"
-          placeholder="Mật khẩu (8–20 ký tự)"
+          placeholder="Mật khẩu (5–20 ký tự)"
           @keyup.enter="submit"
         />
       </div>

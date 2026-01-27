@@ -26,7 +26,7 @@ const goHome = () => {
   router.push('/')
 }
 
-// ✅ THANH TOÁN TRỰC TIẾP
+// THANH TOÁN TRỰC TIẾP
 const checkout = async () => {
   if (cartStore.items.length === 0) {
     Swal.fire({

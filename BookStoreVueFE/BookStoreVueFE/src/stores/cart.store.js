@@ -60,7 +60,15 @@ export const useCartStore = defineStore('cart', {
       const existingIndex = this.items.findIndex(item => item.id === product.id)
 
       if (existingIndex !== -1) {
-        this.items[existingIndex].quantity += 1
+        // Kiểm tra không vượt quá tồn kho
+        const currentQty = this.items[existingIndex].quantity
+        const stockQty = this.items[existingIndex].soLuong
+
+        if (currentQty < stockQty) {
+          this.items[existingIndex].quantity += 1
+        } else {
+          alert(`⚠️ Số lượng tối đa cho "${product.tenSach}" là ${stockQty} cuốn`)
+        }
       } else {
         this.items.push({
           ...product,
@@ -86,8 +94,15 @@ export const useCartStore = defineStore('cart', {
     // Tăng số lượng
     increaseQuantity(index) {
       if (this.items[index]) {
-        this.items[index].quantity += 1
-        this.saveCart()
+        const item = this.items[index]
+        
+        // Kiểm tra không vượt quá tồn kho
+        if (item.quantity < item.soLuong) {
+          item.quantity += 1
+          this.saveCart()
+        } else {
+          alert(`⚠️ Số lượng tối đa cho "${item.tenSach}" là ${item.soLuong} cuốn`)
+        }
       }
     },
 
@@ -99,10 +114,23 @@ export const useCartStore = defineStore('cart', {
       }
     },
 
-    //Cập nhật số lượng thủ công
+    // Cập nhật số lượng thủ công
     updateQuantity(index, quantity) {
-      if (this.items[index] && quantity > 0) {
-        this.items[index].quantity = quantity
+      if (this.items[index]) {
+        const item = this.items[index]
+        const newQty = parseInt(quantity)
+
+        // ✅ Kiểm tra >= 1 và <= tồn kho
+        if (newQty < 1) {
+          alert('⚠️ Số lượng tối thiểu là 1')
+          item.quantity = 1
+        } else if (newQty > item.soLuong) {
+          alert(`⚠️ Số lượng tối đa cho "${item.tenSach}" là ${item.soLuong} cuốn`)
+          item.quantity = item.soLuong
+        } else {
+          item.quantity = newQty
+        }
+
         this.saveCart()
       }
     }

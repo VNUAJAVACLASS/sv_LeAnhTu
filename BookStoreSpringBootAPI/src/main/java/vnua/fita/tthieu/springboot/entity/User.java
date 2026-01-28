@@ -13,10 +13,12 @@ public class User {
     // ko được trùng, ko được để trống trường này
     @Column(unique = true, nullable = false) 
     private String username;  
-    
+
+    @Column(unique = true)
     private String gmail;
     
     // Dùng String để tránh mất số 0 đầu
+    @Column(unique = true)
     private String soDienThoai;
     
     @Column(nullable = false)

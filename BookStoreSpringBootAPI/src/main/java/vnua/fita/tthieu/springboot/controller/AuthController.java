@@ -111,13 +111,17 @@ public class AuthController {
 	            return ResponseEntity.badRequest().body("Mật khẩu phải từ 5-20 ký tự");
 	        }
 
-	        // 3. Kiểm tra email
+	     // 3. Kiểm tra email
 	        if (req.getGmail() == null || req.getGmail().trim().isEmpty()) {
 	            return ResponseEntity.badRequest().body("Email không được để trống");
 	        }
 
 	        if (!isValidEmail(req.getGmail())) {
 	            return ResponseEntity.badRequest().body("Email không hợp lệ");
+	        }
+
+	        if (userRepo.existsByGmail(req.getGmail())) {
+	            return ResponseEntity.badRequest().body("Email đã được sử dụng");
 	        }
 
 	        // 4. Kiểm tra số điện thoại
@@ -129,12 +133,17 @@ public class AuthController {
 	            return ResponseEntity.badRequest().body("Số điện thoại phải có 10-11 chữ số");
 	        }
 
+	        if (userRepo.existsBySoDienThoai(req.getSoDienThoai())) {
+	            return ResponseEntity.badRequest().body("Số điện thoại đã được sử dụng");
+	        }
+
+
 	        // ===== TẠO USER =====
 	        User user = new User();
 	        user.setUsername(req.getUsername());
 	        user.setPassword(passwordEncoder.encode(req.getPassword()));
 	        
-	        // ✅ LƯU EMAIL VÀ SỐ ĐIỆN THOẠI
+	        // LƯU EMAIL VÀ SỐ ĐIỆN THOẠI
 	        user.setGmail(req.getGmail());
 	        user.setSoDienThoai(req.getSoDienThoai());
 

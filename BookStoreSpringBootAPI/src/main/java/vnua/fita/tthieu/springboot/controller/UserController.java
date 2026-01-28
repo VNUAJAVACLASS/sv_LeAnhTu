@@ -112,7 +112,7 @@ public class UserController {
     }
 
     /**
-     * ✅ API ĐỔI MẬT KHẨU
+     * API ĐỔI MẬT KHẨU
      * POST /api/users/change-password
      * Body: {"currentPassword": "...", "newPassword": "..."}
      */
@@ -165,7 +165,7 @@ public class UserController {
     }
 
     /**
-     * ✅ API CẬP NHẬT THÔNG TIN USER
+     * API CẬP NHẬT THÔNG TIN USER
      * PATCH /api/users/update-info
      * Body: {"gmail": "...", "soDienThoai": "...", "diaChi": "..."}
      */

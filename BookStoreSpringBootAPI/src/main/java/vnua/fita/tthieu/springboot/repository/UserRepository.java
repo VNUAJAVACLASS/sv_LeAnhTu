@@ -8,4 +8,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 	// khuôn mẫu JPA: findBy + <tên trường username trong lớp entity User>
 	// đúng khuôn JPA sẽ hỗ trợ tự sinh code
 	Optional<User> findByUsername(String username); 
+	
+	 boolean existsByGmail(String gmail);
+
+	 boolean existsBySoDienThoai(String soDienThoai);
 }

@@ -10,6 +10,7 @@ import vnua.fita.tthieu.springboot.entity.*;
 import vnua.fita.tthieu.springboot.repository.*;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import vnua.fita.tthieu.springboot.dto.OrderDetailResponse;
 import vnua.fita.tthieu.springboot.dto.OrderDetailResponse.BookInOrder;
@@ -31,7 +32,7 @@ public class OrderService {
     private OrderHistoryRepository orderHistoryRepository;
 
     /**
-     * ✅ Tạo đơn hàng mới - FIXED
+     * Tạo đơn hàng mới - FIXED
      * Xử lý đơn hàng có nhiều sách
      */
     @Transactional
@@ -79,9 +80,59 @@ public class OrderService {
         return orderStatusRepository.save(order);
     }
 
+    /**
+     * THANH TOÁN TRỰC TIẾP - Lưu thẳng vào order_history
+     */
+    @Transactional
+    public List<OrderHistory> createDirectOrder(Long userId, List<OrderItemRequest> items) {
+        
+        if (items == null || items.isEmpty()) {
+            throw new RuntimeException("Danh sách sách rỗng");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+
+        List<OrderHistory> histories = new ArrayList<>();
+        LocalDate today = LocalDate.now();
+
+        // Duyệt qua từng sách và lưu vào order_history
+        for (OrderItemRequest item : items) {
+            Book book = bookRepository.findById(item.getBookId())
+                    .orElseThrow(() -> new RuntimeException("Sách không tồn tại"));
+
+            // Kiểm tra số lượng
+            if (item.getSoLuong() <= 0 || book.getSoLuong() < item.getSoLuong()) {
+                throw new RuntimeException("Số lượng không hợp lệ: " + book.getTenSach());
+            }
+
+            // Tạo OrderHistory
+            OrderHistory history = new OrderHistory();
+            history.setUserId(user.getId());
+            history.setUsername(user.getUsername());
+            history.setGmail(user.getGmail());
+            history.setPhone(user.getSoDienThoai());
+            history.setBookId(book.getId());
+            history.setTenSach(book.getTenSach());
+            history.setSoLuong(item.getSoLuong());
+            history.setPriceAtOrder(book.getGia());
+            history.setNgayDat(today);
+            history.setNgayNhan(today); // Thanh toán trực tiếp = ngay hôm nay
+
+            // Trừ kho
+            book.setSoLuong(book.getSoLuong() - item.getSoLuong());
+            bookRepository.save(book);
+
+            // Lưu vào database
+            OrderHistory saved = orderHistoryRepository.save(history);
+            histories.add(saved);
+        }
+
+        return histories;
+    }
 
     /**
-     * ✅ Cập nhật trạng thái đơn hàng - FIXED
+     * Cập nhật trạng thái đơn hàng - FIXED
      * Khi chuyển sang "ĐÃ GIAO" (4) -> Lưu vào order_history
      */
     @Transactional
@@ -95,18 +146,18 @@ public class OrderService {
                 .orElseThrow(() -> new RuntimeException("Đơn hàng không tồn tại"));
 
         Integer currentStatus = order.getTrangThai();
-        
+
         // Không cho phép cập nhật nếu đã hủy hoặc đã trả hàng
         if (currentStatus == 5 || currentStatus == 6) {
             throw new RuntimeException("Không thể cập nhật đơn hàng đã hủy hoặc đã trả hàng");
         }
 
-        // ✅ Nếu chuyển sang "ĐÃ GIAO" (4) -> Lưu vào order_history
+        // Nếu chuyển sang "ĐÃ GIAO" (4) -> Lưu vào order_history
         if (trangThai == 4 && currentStatus != 4) {
             saveToOrderHistory(order);
         }
 
-        // ✅ Nếu HỦY đơn (5) -> Hoàn lại số lượng sách
+        // Nếu HỦY đơn (5) -> Hoàn lại số lượng sách
         if (trangThai == 5) {
             returnBookStock(order);
         }
@@ -116,11 +167,11 @@ public class OrderService {
     }
 
     /**
-     * ✅ Lưu đơn hàng vào order_history khi giao thành công
+     * Lưu đơn hàng vào order_history khi giao thành công
      */
     private void saveToOrderHistory(OrderStatus order) {
         User user = order.getUser();
-        
+
         // Lưu tất cả sách trong đơn vào history
         for (BookOrder bo : order.getBookOrders()) {
             OrderHistory history = new OrderHistory();
@@ -134,7 +185,7 @@ public class OrderService {
             history.setPriceAtOrder(bo.getGiaTaiThoiDiem());
             history.setNgayDat(order.getNgayDat());
             history.setNgayNhan(LocalDate.now());
-            
+
             orderHistoryRepository.save(history);
         }
     }
@@ -200,7 +251,7 @@ public class OrderService {
     public void cancelOrder(Long orderId) {
         updateOrderStatus(orderId, 5);
     }
-    
+
     /**
      * Lấy đơn hàng ĐANG XỬ LÝ của user (trạng thái 1-4)
      */
@@ -210,14 +261,14 @@ public class OrderService {
                 .filter(order -> order.getTrangThai() >= 1 && order.getTrangThai() <= 4)
                 .collect(Collectors.toList());
     }
-    
+
     /**
-     * ✅ Lấy chi tiết đơn hàng - FIXED
+     * Lấy chi tiết đơn hàng - FIXED
      */
     public OrderDetailResponse getOrderDetail(Long orderId) {
         OrderStatus order = orderStatusRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Đơn hàng không tồn tại"));
-        
+
         OrderDetailResponse response = new OrderDetailResponse();
         response.setOrderId(order.getId());
         response.setNgayDat(order.getNgayDat());
@@ -226,7 +277,7 @@ public class OrderService {
         response.setUserId(order.getUser().getId());
         response.setUsername(order.getUser().getUsername());
         response.setSoDienThoai(order.getSoDienThoaiUser());
-        
+
         // Lấy danh sách sách từ BookOrder
         List<BookInOrder> bookList = order.getBookOrders().stream()
                 .map(bo -> new BookInOrder(
@@ -236,7 +287,7 @@ public class OrderService {
                         bo.getGiaTaiThoiDiem()
                 ))
                 .collect(Collectors.toList());
-        
+
         response.setBooks(bookList);
         return response;
     }

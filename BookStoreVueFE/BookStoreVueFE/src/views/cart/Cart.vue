@@ -26,8 +26,8 @@ const goHome = () => {
   router.push('/')
 }
 
-// THANH TOÁN TRỰC TIẾP
-const checkout = async () => {
+// ✅ THANH TOÁN NGÂN HÀNG (tạo đơn hàng trạng thái CHỜ XÁC NHẬN)
+const checkoutBanking = async () => {
   if (cartStore.items.length === 0) {
     Swal.fire({
       icon: 'warning',
@@ -38,68 +38,175 @@ const checkout = async () => {
     return
   }
 
-  // Chuẩn bị dữ liệu gửi lên API
-  const orderData = {
-    userId: authStore.userId,
-    items: cartStore.items.map(item => ({
-      bookId: item.id,
-      soLuong: item.quantity
-    }))
-  }
-
-  try {
-    // Hiển thị loading
-    Swal.fire({
-      title: 'Đang xử lý...',
-      text: 'Vui lòng đợi trong giây lát',
-      allowOutsideClick: false,
-      didOpen: () => {
-        Swal.showLoading()
+  // Thông báo chức năng đang phát triển
+  Swal.fire({
+    icon: 'info',
+    title: 'Thông báo',
+    html: `
+      <p>Chức năng <strong>Thanh toán ngân hàng</strong> đang được phát triển.</p>
+      <p>Đơn hàng của bạn sẽ được tạo ở trạng thái <strong>Chờ xác nhận</strong>.</p>
+      <p>Chúng tôi sẽ cập nhật tính năng thanh toán online sớm nhất!</p>
+    `,
+    confirmButtonText: 'Tiếp tục đặt hàng',
+    showCancelButton: true,
+    cancelButtonText: 'Hủy'
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      // Chuẩn bị dữ liệu gửi lên API
+      const orderData = {
+        userId: authStore.userId,
+        items: cartStore.items.map(item => ({
+          bookId: item.id,
+          soLuong: item.quantity
+        }))
       }
-    })
 
-    // Gọi API tạo đơn hàng
-    const response = await api.post('/orders', orderData)
+      try {
+        // Hiển thị loading
+        Swal.fire({
+          title: 'Đang xử lý...',
+          text: 'Vui lòng đợi trong giây lát',
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading()
+          }
+        })
 
-    // Xóa giỏ hàng sau khi đặt hàng thành công
-    cartStore.clearCart()
+        // Gọi API tạo đơn hàng (trạng thái 1 - CHỜ XÁC NHẬN)
+        const response = await api.post('/orders', orderData)
 
-    // Thông báo thành công
-    Swal.fire({
-      icon: 'success',
-      title: 'Đặt hàng thành công!',
-      html: `
-        <p>Mã đơn hàng: <strong>#${response.data.id}</strong></p>
-        <p>Tổng tiền: <strong>${totalPrice.value.toLocaleString('vi-VN')} đ</strong></p>
-        <p>Đơn hàng của bạn đang được xử lý</p>
-      `,
-      confirmButtonText: 'Xem đơn hàng',
-      showCancelButton: true,
-      cancelButtonText: 'Tiếp tục mua sắm'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        router.push('/profile')
-      } else {
-        router.push('/')
+        // Xóa giỏ hàng sau khi đặt hàng thành công
+        cartStore.clearCart()
+
+        // Thông báo thành công
+        Swal.fire({
+          icon: 'success',
+          title: 'Đặt hàng thành công!',
+          html: `
+            <p>Mã đơn hàng: <strong>#${response.data.id}</strong></p>
+            <p>Tổng tiền: <strong>${totalPrice.value.toLocaleString('vi-VN')} đ</strong></p>
+            <p>Trạng thái: <strong>Chờ xác nhận</strong></p>
+            <p>Vui lòng chờ admin xác nhận đơn hàng của bạn.</p>
+          `,
+          confirmButtonText: 'Xem đơn hàng',
+          showCancelButton: true,
+          cancelButtonText: 'Tiếp tục mua sắm'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            router.push('/profile')
+          } else {
+            router.push('/')
+          }
+        })
+
+      } catch (error) {
+        console.error('Lỗi đặt hàng:', error)
+
+        let errorMessage = 'Có lỗi xảy ra khi đặt hàng'
+
+        if (error.response?.data) {
+          errorMessage = error.response.data
+        }
+
+        Swal.fire({
+          icon: 'error',
+          title: 'Đặt hàng thất bại!',
+          text: errorMessage,
+          confirmButtonText: 'OK'
+        })
       }
-    })
-
-  } catch (error) {
-    console.error('Lỗi đặt hàng:', error)
-    
-    let errorMessage = 'Có lỗi xảy ra khi đặt hàng'
-    
-    if (error.response?.data) {
-      errorMessage = error.response.data
     }
+  })
+}
 
+// ✅ THANH TOÁN TRỰC TIẾP (lưu thẳng vào order_history)
+const checkoutDirect = async () => {
+  if (cartStore.items.length === 0) {
     Swal.fire({
-      icon: 'error',
-      title: 'Đặt hàng thất bại!',
-      text: errorMessage,
+      icon: 'warning',
+      title: 'Giỏ hàng trống!',
+      text: 'Vui lòng thêm sách vào giỏ hàng trước khi thanh toán',
       confirmButtonText: 'OK'
     })
+    return
   }
+
+  // Xác nhận thanh toán trực tiếp
+  Swal.fire({
+    icon: 'question',
+    title: 'Thanh toán trực tiếp',
+    html: `
+      <p>Bạn xác nhận thanh toán <strong>trực tiếp</strong> khi nhận hàng?</p>
+      <p>Tổng tiền: <strong>${totalPrice.value.toLocaleString('vi-VN')} đ</strong></p>
+      <p>Đơn hàng sẽ được giao ngay sau khi xác nhận.</p>
+    `,
+    confirmButtonText: 'Xác nhận',
+    showCancelButton: true,
+    cancelButtonText: 'Hủy',
+    confirmButtonColor: '#27ae60'
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      try {
+        // Hiển thị loading
+        Swal.fire({
+          title: 'Đang xử lý...',
+          text: 'Vui lòng đợi trong giây lát',
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading()
+          }
+        })
+
+        // Gọi API thanh toán trực tiếp (endpoint mới)
+        const response = await api.post('/orders/direct', {
+          userId: authStore.userId,
+          items: cartStore.items.map(item => ({
+            bookId: item.id,
+            soLuong: item.quantity
+          }))
+        })
+
+        // Xóa giỏ hàng sau khi đặt hàng thành công
+        cartStore.clearCart()
+
+        // Thông báo thành công
+        Swal.fire({
+          icon: 'success',
+          title: 'Đặt hàng thành công!',
+          html: `
+            <p>Đơn hàng của bạn đã được xác nhận và sẽ được giao sớm nhất!</p>
+            <p>Tổng tiền: <strong>${totalPrice.value.toLocaleString('vi-VN')} đ</strong></p>
+            <p>Vui lòng chuẩn bị tiền mặt khi nhận hàng.</p>
+          `,
+          confirmButtonText: 'Xem lịch sử mua hàng',
+          showCancelButton: true,
+          cancelButtonText: 'Tiếp tục mua sắm'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            router.push('/profile')
+          } else {
+            router.push('/')
+          }
+        })
+
+      } catch (error) {
+        console.error('Lỗi đặt hàng:', error)
+
+        let errorMessage = 'Có lỗi xảy ra khi đặt hàng'
+
+        if (error.response?.data) {
+          errorMessage = error.response.data
+        }
+
+        Swal.fire({
+          icon: 'error',
+          title: 'Đặt hàng thất bại!',
+          text: errorMessage,
+          confirmButtonText: 'OK'
+        })
+      }
+    }
+  })
 }
 
 // Tính tổng tiền
@@ -226,8 +333,12 @@ const updateQuantity = (index, value) => {
           <i class="fas fa-trash-alt"></i> Xóa toàn bộ
         </button>
 
-        <button @click="checkout" class="btn-checkout">
-          <i class="fas fa-credit-card"></i> Thanh toán trực tiếp
+        <button @click="checkoutBanking" class="btn-checkout-banking">
+          <i class="fas fa-university"></i> Thanh toán ngân hàng
+        </button>
+
+        <button @click="checkoutDirect" class="btn-checkout-direct">
+          <i class="fas fa-hand-holding-usd"></i> Thanh toán trực tiếp
         </button>
       </div>
     </div>
@@ -372,9 +483,10 @@ h2 {
   display: flex;
   justify-content: space-between;
   gap: 15px;
+  flex-wrap: wrap;
 }
 
-.btn-continue, .btn-clear, .btn-checkout {
+.btn-continue, .btn-clear, .btn-checkout-banking, .btn-checkout-direct {
   padding: 12px 24px;
   border: none;
   border-radius: 4px;
@@ -382,6 +494,9 @@ h2 {
   font-weight: 600;
   font-size: 16px;
   transition: 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .btn-continue {
@@ -402,13 +517,35 @@ h2 {
   background: #7f8c8d;
 }
 
-.btn-checkout {
+.btn-checkout-banking {
+  background: #f39c12;
+  color: white;
+  flex: 1;
+}
+
+.btn-checkout-banking:hover {
+  background: #e67e22;
+}
+
+.btn-checkout-direct {
   background: #27ae60;
   color: white;
   flex: 1;
 }
 
-.btn-checkout:hover {
+.btn-checkout-direct:hover {
   background: #229954;
+}
+
+@media (max-width: 768px) {
+  .actions {
+    flex-direction: column;
+  }
+  
+  .btn-checkout-banking,
+  .btn-checkout-direct {
+    width: 100%;
+    justify-content: center;
+  }
 }
 </style>

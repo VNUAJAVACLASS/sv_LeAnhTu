@@ -16,13 +16,15 @@ import vnua.fita.tthieu.springboot.entity.OrderHistory;
 import vnua.fita.tthieu.springboot.entity.OrderStatus;
 import vnua.fita.tthieu.springboot.entity.User;
 import vnua.fita.tthieu.springboot.service.OrderService;
+
 /**
  * Controller quản lý đơn hàng
- * 
+ *
  * Chức năng:
  * - Lấy đơn hàng (tất cả / theo user / theo trạng thái)
  * - Lấy lịch sử đơn hàng (tất cả / theo user)
- * - Tạo đơn hàng
+ * - Tạo đơn hàng (thanh toán ngân hàng)
+ * - Thanh toán trực tiếp (lưu thẳng vào history)
  * - Cập nhật trạng thái đơn hàng (admin)
  * - Hủy đơn hàng (admin)
  */
@@ -127,9 +129,9 @@ public class OrderController {
     }
 
     /**
-     * Tạo đơn hàng mới
+     * Tạo đơn hàng mới (Thanh toán ngân hàng - trạng thái CHỜ XÁC NHẬN)
      * POST /api/orders
-     * Body: {"userId": 1, "bookId": 1, "soLuong": 2}
+     * Body: {"userId": 1, "items": [{"bookId": 1, "soLuong": 2}]}
      */
     @PostMapping
     @PreAuthorize("hasAnyAuthority('ROLE_USER', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
@@ -147,7 +149,31 @@ public class OrderController {
         }
     }
 
+    /**
+     * THANH TOÁN TRỰC TIẾP - Lưu thẳng vào order_history
+     * POST /api/orders/direct
+     * Body: {"userId": 1, "items": [{"bookId": 1, "soLuong": 2}]}
+     */
+    @PostMapping("/direct")
+    @PreAuthorize("hasAnyAuthority('ROLE_USER', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
+    public ResponseEntity<?> createDirectOrder(@RequestBody CreateOrderRequest orderData) {
+        try {
+            Long userId = orderData.getUserId();
+            List<OrderItemRequest> items = orderData.getItems();
 
+            // Gọi service xử lý thanh toán trực tiếp
+            List<OrderHistory> histories = orderService.createDirectOrder(userId, items);
+            
+            return ResponseEntity.ok(Map.of(
+                "message", "Đặt hàng thành công! Đơn hàng sẽ được giao sớm nhất.",
+                "histories", histories
+            ));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Lỗi server: " + e.getMessage());
+        }
+    }
 
     /**
      * Cập nhật trạng thái đơn hàng (chỉ admin)
@@ -157,7 +183,7 @@ public class OrderController {
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
     public ResponseEntity<?> updateOrderStatus(
-            @PathVariable Long id, 
+            @PathVariable Long id,
             @RequestBody Map<String, Integer> statusData) {
         try {
             Integer newStatus = statusData.get("trangThai");
@@ -186,7 +212,7 @@ public class OrderController {
             return ResponseEntity.status(500).body("Lỗi: " + e.getMessage());
         }
     }
-    
+
     /**
      * Lấy đơn hàng ĐANG XỬ LÝ theo userId (trạng thái 1-4)
      * GET /api/orders/processing/{userId}
@@ -237,18 +263,18 @@ public class OrderController {
 
 /*
  * ===== DANH SÁCH API ENDPOINTS =====
- * 
+ *
  * GET    /api/orders                       - Lấy tất cả đơn hàng (Admin only)
  * GET    /api/orders/{id}                  - Lấy đơn hàng theo ID
  * GET    /api/orders/user/{userId}         - Lấy đơn hàng theo user
  * GET    /api/orders/status/{trangThai}    - Lấy đơn hàng theo trạng thái (Admin only)
  * GET    /api/orders/history               - Lấy tất cả lịch sử (Admin only)
  * GET    /api/orders/history/user/{userId} - Lấy lịch sử theo user
- * POST   /api/orders                       - Tạo đơn hàng mới
+ * POST   /api/orders                       - Tạo đơn hàng mới (thanh toán ngân hàng)
+ * POST   /api/orders/direct                - Thanh toán trực tiếp (lưu vào history)
  * PATCH  /api/orders/{id}/status           - Cập nhật trạng thái (Admin only)
  * DELETE /api/orders/{id}                  - Hủy đơn hàng (Admin only)
- * GET    /history/{id}/detail           - Lấy đơn hàng đã lưu vào lịch sur chi tiết theo id (all role)
- * 
+ *
  * ===== TRẠNG THÁI ĐƠN HÀNG =====
  * 1 = CHO_XAC_NHAN   - Chờ xác nhận
  * 2 = DA_XAC_NHAN    - Đã xác nhận

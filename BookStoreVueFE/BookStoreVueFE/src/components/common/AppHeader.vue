@@ -15,7 +15,7 @@
       <!-- Nếu đã đăng nhập -->
       <div v-else class="user-menu">
         <!-- Icon giỏ hàng (chỉ User) -->
-        <router-link v-if="!isAdmin" to="/cart" class="cart-icon">
+        <router-link to="/cart" class="cart-icon">
           🛒
           <span v-if="cartStore.items.length > 0" class="badge">
             {{ cartStore.items.length }}

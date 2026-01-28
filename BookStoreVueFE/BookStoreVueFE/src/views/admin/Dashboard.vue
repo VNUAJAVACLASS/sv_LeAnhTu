@@ -4,6 +4,7 @@ import ManageBooks from './ManageBooks.vue'
 import ManageUsers from './ManageUsers.vue'
 import ManageOrders from './ManageOrders.vue'
 import HistoryOrders from './HistoryOrders.vue'
+import Revenue from './Revenue.vue'
 const activeTab = ref('books')
 </script>
 
@@ -52,6 +53,14 @@ const activeTab = ref('books')
           📜 Lịch sử giao dịch
         </button>
 
+          <button
+          @click="activeTab = 'revenue'"
+          :class="{ active: activeTab === 'revenue' }"
+          class="menu-btn"
+        >
+          💰 Doanh thu
+        </button>
+
         <router-link to="/" class="btn-back">
           ⬅️ Quay về Trang chủ
         </router-link>
@@ -63,6 +72,7 @@ const activeTab = ref('books')
           <ManageUsers v-if="activeTab === 'users'" />
           <ManageOrders v-if="activeTab === 'orders'" />
           <HistoryOrders v-if="activeTab === 'history'" />
+           <Revenue v-if="activeTab === 'revenue'" />
         </div>
 
 

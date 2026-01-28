@@ -19,7 +19,13 @@ const showForm = ref(false)
 const loadBooks = async () => {
   try {
     const res = await api.get('/books')
-    books.value = res.data
+    
+    // ✅ Kiểm tra response có structure phân trang
+    if (res.data.content) {
+      books.value = res.data.content  // Lấy từ content
+    } else {
+      books.value = res.data  // Fallback nếu không có phân trang
+    }
   } catch (error) {
     console.error('Lỗi tải sách:', error)
   }
@@ -91,9 +97,9 @@ const cancelForm = () => {
 }
 
 const formatPrice = (price) => {
-  return new Intl.NumberFormat('vi-VN', { 
-    style: 'currency', 
-    currency: 'VND' 
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND'
   }).format(price)
 }
 </script>
@@ -148,7 +154,7 @@ const formatPrice = (price) => {
       </div>
     </div>
 
-    <!-- BẢNG DANH SÁCH -->
+    <!-- Bảng DANH SÁCH -->
     <div class="table-container">
       <table class="books-table">
         <thead>

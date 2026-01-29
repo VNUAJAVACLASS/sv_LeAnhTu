@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import api from '@/api/axios'
 import Swal from 'sweetalert2'
+import Pagination from '@/components/common/Pagination.vue'
 
 const books = ref([])
 const form = ref({
@@ -16,22 +17,33 @@ const form = ref({
 const isEditing = ref(false)
 const showForm = ref(false)
 
-const loadBooks = async () => {
+// ===== PHÂN TRANG =====
+const currentPage = ref(0)
+const pageSize = ref(20)
+const totalPages = ref(0)
+const totalItems = ref(0)
+const hasNext = ref(false)
+const hasPrevious = ref(false)
+
+const loadBooks = async (page = 0) => {
   try {
-    const res = await api.get('/books')
-    
-    // ✅ Kiểm tra response có structure phân trang
-    if (res.data.content) {
-      books.value = res.data.content  // Lấy từ content
-    } else {
-      books.value = res.data  // Fallback nếu không có phân trang
-    }
+    const res = await api.get('/books', {
+      params: { page, size: pageSize.value }
+    })
+
+    const data = res.data
+    books.value = data.content || []
+    currentPage.value = data.currentPage
+    totalPages.value = data.totalPages
+    totalItems.value = data.totalItems
+    hasNext.value = data.hasNext
+    hasPrevious.value = data.hasPrevious
   } catch (error) {
     console.error('Lỗi tải sách:', error)
   }
 }
 
-onMounted(loadBooks)
+onMounted(() => loadBooks())
 
 const openAddForm = () => {
   form.value = {
@@ -68,7 +80,7 @@ const deleteBook = async (id) => {
     try {
       await api.delete(`/books/${id}`)
       Swal.fire('Đã xóa!', 'Sách đã được xóa thành công', 'success')
-      loadBooks()
+      loadBooks(currentPage.value)
     } catch (error) {
       Swal.fire('Lỗi!', 'Không thể xóa sách', 'error')
     }
@@ -86,7 +98,7 @@ const saveBook = async () => {
     }
 
     showForm.value = false
-    loadBooks()
+    loadBooks(currentPage.value)
   } catch (error) {
     Swal.fire('Lỗi!', 'Không thể lưu sách', 'error')
   }
@@ -193,6 +205,17 @@ const formatPrice = (price) => {
         <p>Chưa có sách nào trong hệ thống</p>
       </div>
     </div>
+
+    <!-- PHÂN TRANG -->
+    <Pagination
+      :current-page="currentPage"
+      :total-pages="totalPages"
+      :total-items="totalItems"
+      :has-next="hasNext"
+      :has-previous="hasPrevious"
+      item-name="sách"
+      @page-change="loadBooks"
+    />
   </div>
 </template>
 

@@ -17,7 +17,10 @@ import vnua.fita.tthieu.springboot.entity.Role;
 import vnua.fita.tthieu.springboot.entity.User;
 import vnua.fita.tthieu.springboot.repository.RoleRepository;
 import vnua.fita.tthieu.springboot.repository.UserRepository;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
@@ -31,11 +34,29 @@ public class UserController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    // Lấy tất cả user (chỉ admin)
     @GetMapping
     @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_SUPER_ADMIN')")
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
+    public ResponseEntity<?> getAllUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        try {
+            Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+            Page<User> userPage = userRepository.findAll(pageable);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("content", userPage.getContent());
+            response.put("currentPage", userPage.getNumber());
+            response.put("totalItems", userPage.getTotalElements());
+            response.put("totalPages", userPage.getTotalPages());
+            response.put("pageSize", userPage.getSize());
+            response.put("hasNext", userPage.hasNext());
+            response.put("hasPrevious", userPage.hasPrevious());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Lỗi: " + e.getMessage());
+        }
     }
 
     // Lấy user theo ID (admin hoặc chính user đó)

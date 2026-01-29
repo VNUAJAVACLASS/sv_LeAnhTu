@@ -35,7 +35,7 @@ const loadProcessingOrders = async () => {
   try {
     if (!userId.value) return
     const res = await api.get(`/orders/processing/${userId.value}`)
-    
+
     processingOrders.value = res.data.filter(order => {
       return order.trangThai >= 1 && order.trangThai <= 4
     })
@@ -97,7 +97,7 @@ const formatPrice = (price) => {
 
 const getStatusText = (status) => {
   const statusMap = {
-    1: 'Chờ xác nhận',
+    1: 'Đang chuẩn bị hàng',
     2: 'Đã xác nhận',
     3: 'Đang giao',
     4: 'Đã giao',
@@ -173,7 +173,7 @@ const getStatusClass = (status) => {
             <i class="fas fa-history"></i> Xem đơn đã hủy/trả hàng
           </button>
         </div>
-        <p class="section-note">* Chỉ hiển thị đơn hàng đang xử lý (Chờ xác nhận → Đã giao)</p>
+        <p class="section-note">* Chỉ hiển thị đơn hàng đang xử lý (Đang chuẩn bị hàng → Đã giao)</p>
 
         <table v-if="processingOrders.length > 0" class="orders-table">
           <thead>

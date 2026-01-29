@@ -1,6 +1,8 @@
 package vnua.fita.tthieu.springboot.controller;
 
+import java.util.HashMap;
 import java.util.List;
+
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +19,10 @@ import vnua.fita.tthieu.springboot.entity.OrderStatus;
 import vnua.fita.tthieu.springboot.entity.User;
 import vnua.fita.tthieu.springboot.service.OrderService;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 /**
  * Controller quản lý đơn hàng
  *
@@ -42,10 +48,24 @@ public class OrderController {
      */
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
-    public ResponseEntity<?> getAllOrders() {
+    public ResponseEntity<?> getAllOrders(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
         try {
-            List<OrderStatus> orders = orderService.getAllOrders();
-            return ResponseEntity.ok(orders);
+            Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+            Page<OrderStatus> orderPage = orderService.getAllOrdersWithPagination(pageable);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("content", orderPage.getContent());
+            response.put("currentPage", orderPage.getNumber());
+            response.put("totalItems", orderPage.getTotalElements());
+            response.put("totalPages", orderPage.getTotalPages());
+            response.put("pageSize", orderPage.getSize());
+            response.put("hasNext", orderPage.hasNext());
+            response.put("hasPrevious", orderPage.hasPrevious());
+
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Lỗi: " + e.getMessage());
         }
@@ -104,10 +124,24 @@ public class OrderController {
      */
     @GetMapping("/history")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
-    public ResponseEntity<?> getAllOrderHistory() {
+    public ResponseEntity<?> getAllOrderHistory(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
         try {
-            List<OrderHistory> histories = orderService.getAllOrderHistory();
-            return ResponseEntity.ok(histories);
+            Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+            Page<OrderHistory> historyPage = orderService.getAllOrderHistoryWithPagination(pageable);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("content", historyPage.getContent());
+            response.put("currentPage", historyPage.getNumber());
+            response.put("totalItems", historyPage.getTotalElements());
+            response.put("totalPages", historyPage.getTotalPages());
+            response.put("pageSize", historyPage.getSize());
+            response.put("hasNext", historyPage.hasNext());
+            response.put("hasPrevious", historyPage.hasPrevious());
+
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Lỗi: " + e.getMessage());
         }

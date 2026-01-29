@@ -2,33 +2,51 @@
 import { ref, onMounted, computed } from 'vue'
 import api from '@/api/axios'
 import Swal from 'sweetalert2'
+import Pagination from '@/components/common/Pagination.vue'
 
 const orders = ref([])
 const searchQuery = ref('')
 const selectedOrder = ref(null)
 const showDetail = ref(false)
 
-// Tìm kiếm
+// ===== PHÂN TRANG =====
+const currentPage = ref(0)
+const pageSize = ref(20)
+const totalPages = ref(0)
+const totalItems = ref(0)
+const hasNext = ref(false)
+const hasPrevious = ref(false)
+
+// Tìm kiếm local
 const filteredOrders = computed(() => {
   if (!searchQuery.value) return orders.value
   const query = searchQuery.value.toLowerCase()
-  return orders.value.filter(order => 
+  return orders.value.filter(order =>
     order.id?.toString().includes(query) ||
     order.user?.username?.toLowerCase().includes(query) ||
     order.soDienThoaiUser?.includes(query)
   )
 })
 
-const loadOrders = async () => {
+const loadOrders = async (page = 0) => {
   try {
-    const res = await api.get('/orders')
-    orders.value = res.data
+    const res = await api.get('/orders', {
+      params: { page, size: pageSize.value }
+    })
+
+    const data = res.data
+    orders.value = data.content || data
+    currentPage.value = data.currentPage || 0
+    totalPages.value = data.totalPages || 1
+    totalItems.value = data.totalItems || data.length
+    hasNext.value = data.hasNext || false
+    hasPrevious.value = data.hasPrevious || false
   } catch (error) {
     console.error('Lỗi tải đơn hàng:', error)
   }
 }
 
-onMounted(loadOrders)
+onMounted(() => loadOrders())
 
 const viewDetail = async (orderId) => {
   try {
@@ -41,13 +59,50 @@ const viewDetail = async (orderId) => {
 }
 
 const updateStatus = async (order, newStatus) => {
+  if (order.trangThai === 4 && newStatus !== 6) {
+    Swal.fire({
+      icon: 'error',
+      title: 'Không được phép!',
+      text: 'Đơn hàng đã giao chỉ có thể chuyển sang trạng thái Trả hàng',
+      confirmButtonText: 'OK'
+    })
+    return
+  }
+
+  if (newStatus === 6) {
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: 'Xác nhận trả hàng',
+      html: `
+        <p>Bạn có chắc chắn muốn <strong>TRẢ HÀNG</strong> đơn #${order.id}?</p>
+        <p style="color: #e74c3c; font-weight: bold;">
+          ⚠️ Hành động này sẽ:
+        </p>
+        <ul style="text-align: left; color: #555;">
+          <li>Xóa đơn hàng khỏi lịch sử giao dịch</li>
+          <li>Giảm doanh thu</li>
+          <li>Hoàn lại hàng vào kho</li>
+        </ul>
+      `,
+      showCancelButton: true,
+      confirmButtonColor: '#e74c3c',
+      cancelButtonColor: '#95a5a6',
+      confirmButtonText: 'Xác nhận trả hàng',
+      cancelButtonText: 'Hủy'
+    })
+
+    if (!result.isConfirmed) {
+      return
+    }
+  }
+
   try {
     await api.patch(`/orders/${order.id}/status`, {
       trangThai: newStatus
     })
-    
+
     Swal.fire('Thành công!', 'Cập nhật trạng thái thành công', 'success')
-    loadOrders()
+    loadOrders(currentPage.value)
   } catch (error) {
     Swal.fire('Lỗi!', error.response?.data || 'Không thể cập nhật trạng thái', 'error')
   }
@@ -69,7 +124,7 @@ const cancelOrder = async (orderId) => {
     try {
       await api.delete(`/orders/${orderId}`)
       Swal.fire('Đã hủy!', 'Đơn hàng đã được hủy', 'success')
-      loadOrders()
+      loadOrders(currentPage.value)
     } catch (error) {
       Swal.fire('Lỗi!', error.response?.data || 'Không thể hủy đơn hàng', 'error')
     }
@@ -90,7 +145,7 @@ const formatPrice = (price) => {
 
 const getStatusText = (status) => {
   const statusMap = {
-    1: 'Chờ xác nhận',
+    1: 'Đang chuẩn bị hàng',
     2: 'Đã xác nhận',
     3: 'Đang giao',
     4: 'Đã giao',
@@ -117,15 +172,15 @@ const getStatusClass = (status) => {
   <div class="manage-orders">
     <div class="header">
       <h3>📦 Quản lý Đơn hàng</h3>
-      <input 
-        v-model="searchQuery" 
-        type="text" 
+      <input
+        v-model="searchQuery"
+        type="text"
         placeholder="🔍 Tìm kiếm đơn hàng..."
         class="search-input"
       />
     </div>
 
-    <!-- BẢNG DANH SÁCH -->
+    <!-- Bảng DANH SÁCH -->
     <div class="table-container">
       <table class="orders-table">
         <thead>
@@ -148,28 +203,28 @@ const getStatusClass = (status) => {
             <td>{{ formatDate(order.ngayDat) }}</td>
             <td class="price">{{ formatPrice(order.tongGiaTien) }}</td>
             <td>
-              <select 
+              <select
                 :value="order.trangThai"
                 @change="updateStatus(order, Number($event.target.value))"
                 :class="['status-select', getStatusClass(order.trangThai)]"
                 :disabled="order.trangThai === 5 || order.trangThai === 6"
               >
-                <option value="1">Chờ xác nhận</option>
+                <option value="1">Đang chuẩn bị hàng</option>
                 <option value="2">Đã xác nhận</option>
                 <option value="3">Đang giao</option>
                 <option value="4">Đã giao</option>
-                <option value="5">Đã hủy</option>
-                <option value="6">Đã trả hàng</option>
+                <option value="6" v-if="order.trangThai === 4">Đã trả hàng</option>
+                <option value="5" v-if="order.trangThai < 4">Đã hủy</option>
               </select>
             </td>
             <td>
               <button @click="viewDetail(order.id)" class="btn-view">
                 <i class="fas fa-eye"></i> Xem
               </button>
-              <button 
-                @click="cancelOrder(order.id)" 
+              <button
+                @click="cancelOrder(order.id)"
                 class="btn-cancel-order"
-                :disabled="order.trangThai === 5 || order.trangThai === 6"
+                :disabled="order.trangThai >= 4 || order.trangThai === 5 || order.trangThai === 6"
               >
                 <i class="fas fa-ban"></i> Hủy
               </button>
@@ -183,7 +238,19 @@ const getStatusClass = (status) => {
       </div>
     </div>
 
-    <!-- MODAL CHI TIẾT ĐỚN HÀNG -->
+    <!-- PHÂN TRANG (chỉ hiện khi không search) -->
+    <Pagination
+      v-if="!searchQuery"
+      :current-page="currentPage"
+      :total-pages="totalPages"
+      :total-items="totalItems"
+      :has-next="hasNext"
+      :has-previous="hasPrevious"
+      item-name="đơn hàng"
+      @page-change="loadOrders"
+    />
+
+    <!-- MODAL CHI TIẾT ĐƠN HÀNG -->
     <div v-if="showDetail && selectedOrder" class="modal-overlay" @click.self="showDetail = false">
       <div class="modal-content">
         <div class="modal-header">
@@ -285,6 +352,7 @@ const getStatusClass = (status) => {
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
 }
 
 .orders-table {
@@ -548,5 +616,16 @@ const getStatusClass = (status) => {
 
 .btn-ok:hover {
   background: #2980b9;
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-input {
+    width: 100%;
+  }
 }
 </style>

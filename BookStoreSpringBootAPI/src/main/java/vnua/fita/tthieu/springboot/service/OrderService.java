@@ -1,6 +1,7 @@
 package vnua.fita.tthieu.springboot.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,7 +16,8 @@ import java.util.List;
 import vnua.fita.tthieu.springboot.dto.OrderDetailResponse;
 import vnua.fita.tthieu.springboot.dto.OrderDetailResponse.BookInOrder;
 import java.util.stream.Collectors;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 @Service
 public class OrderService {
 
@@ -85,7 +87,7 @@ public class OrderService {
      */
     @Transactional
     public List<OrderHistory> createDirectOrder(Long userId, List<OrderItemRequest> items) {
-        
+
         if (items == null || items.isEmpty()) {
             throw new RuntimeException("Danh sách sách rỗng");
         }
@@ -108,6 +110,8 @@ public class OrderService {
 
             // Tạo OrderHistory
             OrderHistory history = new OrderHistory();
+            // ✅ orderId = null vì không tạo order_status
+            history.setOrderId(null);
             history.setUserId(user.getId());
             history.setUsername(user.getUsername());
             history.setGmail(user.getGmail());
@@ -132,8 +136,7 @@ public class OrderService {
     }
 
     /**
-     * Cập nhật trạng thái đơn hàng - FIXED
-     * Khi chuyển sang "ĐÃ GIAO" (4) -> Lưu vào order_history
+     * Cập nhật trạng thái đơn hàng
      */
     @Transactional
     public OrderStatus updateOrderStatus(Long orderId, Integer trangThai) {
@@ -147,9 +150,30 @@ public class OrderService {
 
         Integer currentStatus = order.getTrangThai();
 
+        // Nếu đã giao (4), CHỈ cho phép chuyển sang Trả hàng (6)
+        if (currentStatus == 4 && trangThai != 6) {
+            throw new RuntimeException("Đơn hàng đã giao chỉ có thể chuyển sang trạng thái Trả hàng");
+        }
+
         // Không cho phép cập nhật nếu đã hủy hoặc đã trả hàng
         if (currentStatus == 5 || currentStatus == 6) {
             throw new RuntimeException("Không thể cập nhật đơn hàng đã hủy hoặc đã trả hàng");
+        }
+
+        // Khi chuyển sang TRẢ HÀNG (6)
+        if (trangThai == 6) {
+            // 1. Tìm tất cả record trong order_history theo orderId
+            List<OrderHistory> histories = orderHistoryRepository.findByOrderId(orderId);
+            
+            if (histories.isEmpty()) {
+                throw new RuntimeException("Không tìm thấy lịch sử đơn hàng để trả");
+            }
+            
+            // 2. Xóa tất cả record (tự động trừ doanh thu)
+            orderHistoryRepository.deleteAll(histories);
+            
+            // 3. Hoàn lại số lượng sách vào kho
+            returnBookStock(order);
         }
 
         // Nếu chuyển sang "ĐÃ GIAO" (4) -> Lưu vào order_history
@@ -158,7 +182,11 @@ public class OrderService {
         }
 
         // Nếu HỦY đơn (5) -> Hoàn lại số lượng sách
+        // CHỈ cho phép hủy khi chưa giao (< 4)
         if (trangThai == 5) {
+            if (currentStatus >= 4) {
+                throw new RuntimeException("Không thể hủy đơn hàng đã giao");
+            }
             returnBookStock(order);
         }
 
@@ -175,6 +203,10 @@ public class OrderService {
         // Lưu tất cả sách trong đơn vào history
         for (BookOrder bo : order.getBookOrders()) {
             OrderHistory history = new OrderHistory();
+            
+            //LƯU orderId để có thể tìm và xóa khi trả hàng
+            history.setOrderId(order.getId());
+            
             history.setUserId(user.getId());
             history.setUsername(user.getUsername());
             history.setGmail(user.getGmail());
@@ -202,14 +234,7 @@ public class OrderService {
     }
 
     /**
-     * Lấy tất cả đơn hàng
-     */
-    public List<OrderStatus> getAllOrders() {
-        return orderStatusRepository.findAll();
-    }
-
-    /**
-     * ✅ Lấy đơn hàng theo user - FIXED
+     * ✅ Lấy đơn hàng theo user
      */
     public List<OrderStatus> getOrdersByUser(Long userId) {
         return orderStatusRepository.findByUserId(userId);
@@ -231,10 +256,17 @@ public class OrderService {
     }
 
     /**
-     * Lấy tất cả lịch sử đơn hàng
+     * Lấy tất cả đơn hàng với phân trang
      */
-    public List<OrderHistory> getAllOrderHistory() {
-        return orderHistoryRepository.findAll();
+    public Page<OrderStatus> getAllOrdersWithPagination(Pageable pageable) {
+        return orderStatusRepository.findAll(pageable);
+    }
+
+    /**
+     * Lấy tất cả lịch sử với phân trang
+     */
+    public Page<OrderHistory> getAllOrderHistoryWithPagination(Pageable pageable) {
+        return orderHistoryRepository.findAll(pageable);
     }
 
     /**

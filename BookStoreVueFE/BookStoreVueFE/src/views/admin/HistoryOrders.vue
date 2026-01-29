@@ -1,15 +1,24 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import api from '@/api/axios'
+import Pagination from '@/components/common/Pagination.vue'
 
 const histories = ref([])
 const searchQuery = ref('')
 
-// Tìm kiếm
+// ===== PHÂN TRANG =====
+const currentPage = ref(0)
+const pageSize = ref(20)
+const totalPages = ref(0)
+const totalItems = ref(0)
+const hasNext = ref(false)
+const hasPrevious = ref(false)
+
+// Tìm kiếm local
 const filteredHistories = computed(() => {
   if (!searchQuery.value) return histories.value
   const query = searchQuery.value.toLowerCase()
-  return histories.value.filter(item => 
+  return histories.value.filter(item =>
     item.id?.toString().includes(query) ||
     item.username?.toLowerCase().includes(query) ||
     item.tenSach?.toLowerCase().includes(query) ||
@@ -17,16 +26,25 @@ const filteredHistories = computed(() => {
   )
 })
 
-const loadHistories = async () => {
+const loadHistories = async (page = 0) => {
   try {
-    const res = await api.get('/orders/history')
-    histories.value = res.data
+    const res = await api.get('/orders/history', {
+      params: { page, size: pageSize.value }
+    })
+
+    const data = res.data
+    histories.value = data.content || data
+    currentPage.value = data.currentPage || 0
+    totalPages.value = data.totalPages || 1
+    totalItems.value = data.totalItems || data.length
+    hasNext.value = data.hasNext || false
+    hasPrevious.value = data.hasPrevious || false
   } catch (error) {
     console.error('Lỗi tải lịch sử:', error)
   }
 }
 
-onMounted(loadHistories)
+onMounted(() => loadHistories())
 
 const formatDate = (date) => {
   if (!date) return 'N/A'
@@ -43,15 +61,34 @@ const formatPrice = (price) => {
 const calculateTotal = (item) => {
   return item.soLuong * item.priceAtOrder
 }
+
+// Thống kê
+const statistics = computed(() => {
+  const total = histories.value.reduce((sum, item) => {
+    return sum + calculateTotal(item)
+  }, 0)
+
+  const totalOrders = histories.value.length
+
+  const totalBooks = histories.value.reduce((sum, item) => {
+    return sum + item.soLuong
+  }, 0)
+
+  return {
+    totalRevenue: total,
+    totalOrders,
+    totalBooks
+  }
+})
 </script>
 
 <template>
   <div class="history-orders">
     <div class="header">
       <h3>📜 Lịch sử giao dịch</h3>
-      <input 
-        v-model="searchQuery" 
-        type="text" 
+      <input
+        v-model="searchQuery"
+        type="text"
         placeholder="🔍 Tìm kiếm lịch sử..."
         class="search-input"
       />
@@ -96,25 +133,17 @@ const calculateTotal = (item) => {
       </div>
     </div>
 
-    <!-- THỐNG KÊ -->
-    <div v-if="histories.length > 0" class="statistics">
-      <div class="stat-card">
-        <div class="stat-label">Tổng giao dịch</div>
-        <div class="stat-value">{{ histories.length }}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Tổng sách đã bán</div>
-        <div class="stat-value">
-          {{ histories.reduce((sum, item) => sum + item.soLuong, 0) }}
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Tổng doanh thu</div>
-        <div class="stat-value price">
-          {{ formatPrice(histories.reduce((sum, item) => sum + calculateTotal(item), 0)) }}
-        </div>
-      </div>
-    </div>
+    <!-- PHÂN TRANG (chỉ hiện khi không search) -->
+    <Pagination
+      v-if="!searchQuery"
+      :current-page="currentPage"
+      :total-pages="totalPages"
+      :total-items="totalItems"
+      :has-next="hasNext"
+      :has-previous="hasPrevious"
+      item-name="giao dịch"
+      @page-change="loadHistories"
+    />
   </div>
 </template>
 
@@ -150,12 +179,56 @@ const calculateTotal = (item) => {
   border-color: #3498db;
 }
 
+/* THỐNG KÊ */
+.statistics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.stat-card {
+  background: white;
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  text-align: center;
+  border-left: 4px solid #3498db;
+}
+
+.stat-card:nth-child(2) {
+  border-left-color: #27ae60;
+}
+
+.stat-card:nth-child(3) {
+  border-left-color: #e74c3c;
+}
+
+.stat-label {
+  color: #7f8c8d;
+  font-size: 14px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+.stat-value.price {
+  color: #e74c3c;
+  font-size: 24px;
+}
+
 .table-container {
   background: white;
   border-radius: 8px;
   overflow-x: auto;
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
 .history-table {
@@ -223,54 +296,16 @@ const calculateTotal = (item) => {
   color: #7f8c8d;
 }
 
-/* THỐNG KÊ */
-.statistics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-}
-
-.stat-card {
-  background: white;
-  padding: 25px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  text-align: center;
-  border-left: 4px solid #3498db;
-}
-
-.stat-card:nth-child(2) {
-  border-left-color: #27ae60;
-}
-
-.stat-card:nth-child(3) {
-  border-left-color: #e74c3c;
-}
-
-.stat-label {
-  color: #7f8c8d;
-  font-size: 14px;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.stat-value {
-  font-size: 32px;
-  font-weight: bold;
-  color: #2c3e50;
-}
-
-.stat-value.price {
-  color: #e74c3c;
-  font-size: 24px;
-}
-
 @media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .search-input {
     width: 100%;
   }
-  
+
   .statistics {
     grid-template-columns: 1fr;
   }

@@ -7,4 +7,6 @@ import java.util.List;
 public interface OrderHistoryRepository extends JpaRepository<OrderHistory, Long> {
     // Tìm lịch sử đơn hàng theo userId
     List<OrderHistory> findByUserId(Long userId);
+    
+    List<OrderHistory> findByOrderId(Long orderId);
 }

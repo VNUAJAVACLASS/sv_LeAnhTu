@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import api from '@/api/axios'
 import Swal from 'sweetalert2'
+import Pagination from '@/components/common/Pagination.vue'
 
 const users = ref([])
 const searchQuery = ref('')
@@ -18,27 +19,44 @@ const form = ref({
 const isEditing = ref(false)
 const showForm = ref(false)
 
-// Tìm kiếm
+// ===== PHÂN TRANG =====
+const currentPage = ref(0)
+const pageSize = ref(20)
+const totalPages = ref(0)
+const totalItems = ref(0)
+const hasNext = ref(false)
+const hasPrevious = ref(false)
+
+// Tìm kiếm local (sau khi đã load về)
 const filteredUsers = computed(() => {
   if (!searchQuery.value) return users.value
   const query = searchQuery.value.toLowerCase()
-  return users.value.filter(user => 
+  return users.value.filter(user =>
     user.username?.toLowerCase().includes(query) ||
     user.gmail?.toLowerCase().includes(query) ||
     user.soDienThoai?.includes(query)
   )
 })
 
-const loadUsers = async () => {
+const loadUsers = async (page = 0) => {
   try {
-    const res = await api.get('/users')
-    users.value = res.data
+    const res = await api.get('/users', {
+      params: { page, size: pageSize.value }
+    })
+
+    const data = res.data
+    users.value = data.content || data
+    currentPage.value = data.currentPage || 0
+    totalPages.value = data.totalPages || 1
+    totalItems.value = data.totalItems || data.length
+    hasNext.value = data.hasNext || false
+    hasPrevious.value = data.hasPrevious || false
   } catch (error) {
     console.error('Lỗi tải users:', error)
   }
 }
 
-onMounted(loadUsers)
+onMounted(() => loadUsers())
 
 const openAddForm = () => {
   form.value = {
@@ -84,7 +102,7 @@ const deleteUser = async (id) => {
     try {
       await api.delete(`/users/${id}`)
       Swal.fire('Đã xóa!', 'User đã được xóa thành công', 'success')
-      loadUsers()
+      loadUsers(currentPage.value)
     } catch (error) {
       Swal.fire('Lỗi!', error.response?.data || 'Không thể xóa user', 'error')
     }
@@ -94,27 +112,22 @@ const deleteUser = async (id) => {
 const saveUser = async () => {
   try {
     if (isEditing.value) {
-      // Cập nhật roles
       await api.patch(`/users/${form.value.id}/roles`, form.value.roles)
-      
       Swal.fire('Thành công!', 'Cập nhật user thành công', 'success')
     } else {
-      // Tạo mới user (cần API register)
       if (!form.value.username || !form.value.password) {
         Swal.fire('Lỗi!', 'Username và password không được để trống', 'error')
         return
       }
-      
       await api.post('/auth/register', {
         username: form.value.username,
         password: form.value.password
       })
-      
       Swal.fire('Thành công!', 'Thêm user mới thành công', 'success')
     }
 
     showForm.value = false
-    loadUsers()
+    loadUsers(currentPage.value)
   } catch (error) {
     Swal.fire('Lỗi!', error.response?.data || 'Không thể lưu user', 'error')
   }
@@ -135,9 +148,9 @@ const getRoleNames = (roles) => {
     <div class="header">
       <h3>👤 Quản lý User</h3>
       <div class="header-actions">
-        <input 
-          v-model="searchQuery" 
-          type="text" 
+        <input
+          v-model="searchQuery"
+          type="text"
           placeholder="🔍 Tìm kiếm user..."
           class="search-input"
         />
@@ -154,9 +167,9 @@ const getRoleNames = (roles) => {
 
         <div class="form-group">
           <label>Username:</label>
-          <input 
-            v-model="form.username" 
-            type="text" 
+          <input
+            v-model="form.username"
+            type="text"
             placeholder="Nhập username"
             :disabled="isEditing"
           />
@@ -205,7 +218,7 @@ const getRoleNames = (roles) => {
       </div>
     </div>
 
-    <!-- BẢNG DANH SÁCH -->
+    <!-- Bảng DANH SÁCH -->
     <div class="table-container">
       <table class="users-table">
         <thead>
@@ -234,8 +247,8 @@ const getRoleNames = (roles) => {
               <button @click="editUser(user)" class="btn-edit">
                 <i class="fas fa-edit"></i>
               </button>
-              <button 
-                @click="deleteUser(user.id)" 
+              <button
+                @click="deleteUser(user.id)"
                 class="btn-delete"
                 :disabled="user.superAdmin"
               >
@@ -250,10 +263,23 @@ const getRoleNames = (roles) => {
         <p>{{ searchQuery ? 'Không tìm thấy user phù hợp' : 'Chưa có user nào trong hệ thống' }}</p>
       </div>
     </div>
+
+    <!-- PHÂN TRANG (chỉ hiện khi không search) -->
+    <Pagination
+      v-if="!searchQuery"
+      :current-page="currentPage"
+      :total-pages="totalPages"
+      :total-items="totalItems"
+      :has-next="hasNext"
+      :has-previous="hasPrevious"
+      item-name="user"
+      @page-change="loadUsers"
+    />
   </div>
 </template>
 
 <style scoped>
+/* Copy style từ file cũ và thêm style cho phân trang */
 .manage-users {
   padding: 20px;
 }
@@ -403,6 +429,7 @@ const getRoleNames = (roles) => {
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
 }
 
 .users-table {

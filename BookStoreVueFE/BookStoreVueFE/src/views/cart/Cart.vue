@@ -26,7 +26,6 @@ const goHome = () => {
   router.push('/')
 }
 
-// ✅ THANH TOÁN NGÂN HÀNG (tạo đơn hàng trạng thái CHỜ XÁC NHẬN)
 const checkoutBanking = async () => {
   if (cartStore.items.length === 0) {
     Swal.fire({
@@ -38,13 +37,12 @@ const checkoutBanking = async () => {
     return
   }
 
-  // Thông báo chức năng đang phát triển
   Swal.fire({
     icon: 'info',
     title: 'Thông báo',
     html: `
       <p>Chức năng <strong>Thanh toán ngân hàng</strong> đang được phát triển.</p>
-      <p>Đơn hàng của bạn sẽ được tạo ở trạng thái <strong>Chờ xác nhận</strong>.</p>
+      <p>Đơn hàng của bạn sẽ được tạo ở trạng thái <strong>Đang chuẩn bị hàng</strong>.</p>
       <p>Chúng tôi sẽ cập nhật tính năng thanh toán online sớm nhất!</p>
     `,
     confirmButtonText: 'Tiếp tục đặt hàng',
@@ -52,7 +50,6 @@ const checkoutBanking = async () => {
     cancelButtonText: 'Hủy'
   }).then(async (result) => {
     if (result.isConfirmed) {
-      // Chuẩn bị dữ liệu gửi lên API
       const orderData = {
         userId: authStore.userId,
         items: cartStore.items.map(item => ({
@@ -62,7 +59,6 @@ const checkoutBanking = async () => {
       }
 
       try {
-        // Hiển thị loading
         Swal.fire({
           title: 'Đang xử lý...',
           text: 'Vui lòng đợi trong giây lát',
@@ -72,20 +68,17 @@ const checkoutBanking = async () => {
           }
         })
 
-        // Gọi API tạo đơn hàng (trạng thái 1 - CHỜ XÁC NHẬN)
         const response = await api.post('/orders', orderData)
 
-        // Xóa giỏ hàng sau khi đặt hàng thành công
         cartStore.clearCart()
 
-        // Thông báo thành công
         Swal.fire({
           icon: 'success',
           title: 'Đặt hàng thành công!',
           html: `
             <p>Mã đơn hàng: <strong>#${response.data.id}</strong></p>
             <p>Tổng tiền: <strong>${totalPrice.value.toLocaleString('vi-VN')} đ</strong></p>
-            <p>Trạng thái: <strong>Chờ xác nhận</strong></p>
+            <p>Trạng thái: <strong>Đang chuẩn bị hàng</strong></p>
             <p>Vui lòng chờ admin xác nhận đơn hàng của bạn.</p>
           `,
           confirmButtonText: 'Xem đơn hàng',
@@ -119,7 +112,6 @@ const checkoutBanking = async () => {
   })
 }
 
-// ✅ THANH TOÁN TRỰC TIẾP (lưu thẳng vào order_history)
 const checkoutDirect = async () => {
   if (cartStore.items.length === 0) {
     Swal.fire({
@@ -131,7 +123,6 @@ const checkoutDirect = async () => {
     return
   }
 
-  // Xác nhận thanh toán trực tiếp
   Swal.fire({
     icon: 'question',
     title: 'Thanh toán trực tiếp',
@@ -147,7 +138,6 @@ const checkoutDirect = async () => {
   }).then(async (result) => {
     if (result.isConfirmed) {
       try {
-        // Hiển thị loading
         Swal.fire({
           title: 'Đang xử lý...',
           text: 'Vui lòng đợi trong giây lát',
@@ -157,7 +147,6 @@ const checkoutDirect = async () => {
           }
         })
 
-        // Gọi API thanh toán trực tiếp (endpoint mới)
         const response = await api.post('/orders/direct', {
           userId: authStore.userId,
           items: cartStore.items.map(item => ({
@@ -166,10 +155,8 @@ const checkoutDirect = async () => {
           }))
         })
 
-        // Xóa giỏ hàng sau khi đặt hàng thành công
         cartStore.clearCart()
 
-        // Thông báo thành công
         Swal.fire({
           icon: 'success',
           title: 'Đặt hàng thành công!',
@@ -209,24 +196,20 @@ const checkoutDirect = async () => {
   })
 }
 
-// Tính tổng tiền
 const totalPrice = computed(() => {
   return cartStore.items.reduce((sum, item) => {
     return sum + (item.gia * item.quantity)
   }, 0)
 })
 
-// Tăng số lượng
 const increaseQuantity = (index) => {
   cartStore.increaseQuantity(index)
 }
 
-// Giảm số lượng
 const decreaseQuantity = (index) => {
   cartStore.decreaseQuantity(index)
 }
 
-// Cập nhật số lượng thủ công
 const updateQuantity = (index, value) => {
   const qty = parseInt(value)
   if (qty > 0) {
@@ -310,7 +293,6 @@ const updateQuantity = (index, value) => {
         </tbody>
       </table>
 
-      <!-- Tổng kết -->
       <div class="cart-summary">
         <div class="summary-row">
           <span>Tổng số lượng:</span>
@@ -323,7 +305,6 @@ const updateQuantity = (index, value) => {
         </div>
       </div>
 
-      <!-- Actions -->
       <div class="actions">
         <button @click="goHome" class="btn-continue">
           <i class="fas fa-arrow-left"></i> Tiếp tục mua sắm
@@ -541,7 +522,7 @@ h2 {
   .actions {
     flex-direction: column;
   }
-  
+
   .btn-checkout-banking,
   .btn-checkout-direct {
     width: 100%;

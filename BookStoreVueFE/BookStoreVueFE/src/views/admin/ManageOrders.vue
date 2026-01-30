@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/api/axios'
 import Swal from 'sweetalert2'
 import Pagination from '@/components/common/Pagination.vue'
@@ -203,11 +204,19 @@ const getStatusClass = (status) => {
             <td>{{ formatDate(order.ngayDat) }}</td>
             <td class="price">{{ formatPrice(order.tongGiaTien) }}</td>
             <td>
+              <span 
+                v-if="order.trangThai === 5 || order.trangThai === 6"
+                :class="['status-badge', getStatusClass(order.trangThai)]"
+              >
+                {{ getStatusText(order.trangThai) }}
+              </span>
+
+              <!-- Nếu chưa hủy/trả, hiển thị select như cũ -->
               <select
+                v-else
                 :value="order.trangThai"
                 @change="updateStatus(order, Number($event.target.value))"
                 :class="['status-select', getStatusClass(order.trangThai)]"
-                :disabled="order.trangThai === 5 || order.trangThai === 6"
               >
                 <option value="1">Đang chuẩn bị hàng</option>
                 <option value="2">Đã xác nhận</option>
@@ -387,17 +396,27 @@ const getStatusClass = (status) => {
   font-weight: 600;
 }
 
+/* ✅ Style cho status badge (hiển thị text) */
+.status-badge {
+   padding: 6px 10px;
+  border-radius: 4px; 
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-block;
+  border: 2px solid;
+  min-width: 150px;  /* Độ rộng tối thiểu giống select */
+  text-align: center; /* Căn giữa text */
+  cursor: not-allowed; /* Con trỏ chuột báo không sửa được */
+  user-select: none;  /* Không cho bôi đen text */
+}
+
 .status-select {
   padding: 6px 10px;
   border: 2px solid;
   border-radius: 4px;
   font-weight: 600;
   cursor: pointer;
-}
-
-.status-select:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
+  min-width: 150px;
 }
 
 .status-pending {
@@ -548,13 +567,6 @@ const getStatusClass = (status) => {
 
 .info-row strong {
   color: #2c3e50;
-}
-
-.status-badge {
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
 }
 
 .modal-body h4 {

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api/axios'
 import { useAuthStore } from '@/stores/auth.store'
@@ -11,68 +11,178 @@ const cartStore = useCartStore()
 
 // State
 const books = ref([])
+const allBooks = ref([]) 
 const sortType = ref('all')
 const loading = ref(false)
 
+// ===== TÌM KIẾM AUTOCOMPLETE =====
+const searchQuery = ref('')
+const showSuggestions = ref(false)
+const selectedSuggestionIndex = ref(-1)
+const searchInputRef = ref(null)
+
 // ===== PHÂN TRANG =====
-const currentPage = ref(0)      // Trang hiện tại (bắt đầu từ 0)
-const pageSize = ref(10)        // Số sách mỗi trang
-const totalPages = ref(0)       // Tổng số trang
-const totalItems = ref(0)       // Tổng số sách
-const hasNext = ref(false)      // Có trang tiếp theo?
-const hasPrevious = ref(false)  // Có trang trước?
+const currentPage = ref(0)
+const pageSize = ref(10)
+const totalPages = ref(0)
+const totalItems = ref(0)
+const hasNext = ref(false)
+const hasPrevious = ref(false)
+
+// ===== DEBOUNCE TIMER =====
+let debounceTimer = null
 
 // Computed properties
 const isLoggedIn = computed(() => auth.isLoggedIn)
 const isAdmin = computed(() => auth.isAdmin)
 const username = computed(() => auth.user?.username || '')
 
+// ===== GỢI Ý TÌM KIẾM (AUTOCOMPLETE) =====
+const suggestions = computed(() => {
+  if (!searchQuery.value || searchQuery.value.trim().length < 1) {
+    return { books: [], authors: [] }
+  }
+
+  const query = searchQuery.value.toLowerCase().trim()
+
+  // Lọc sách theo tên
+  const bookSuggestions = allBooks.value
+    .filter(book => book.tenSach?.toLowerCase().includes(query))
+    .slice(0, 5)
+    .map(book => ({
+      type: 'book',
+      id: book.id,
+      text: book.tenSach,
+      price: book.gia,
+      stock: book.soLuong
+    }))
+
+  // Lọc tác giả (loại bỏ trùng lặp)
+  const authorSet = new Set()
+  const authorSuggestions = allBooks.value
+    .filter(book => {
+      const tacGia = book.tacGia?.toLowerCase() || ''
+      if (tacGia.includes(query) && !authorSet.has(book.tacGia)) {
+        authorSet.add(book.tacGia)
+        return true
+      }
+      return false
+    })
+    .slice(0, 5)
+    .map(book => ({
+      type: 'author',
+      text: book.tacGia
+    }))
+
+  return {
+    books: bookSuggestions,
+    authors: authorSuggestions
+  }
+})
+
+// Tổng số gợi ý
+const totalSuggestions = computed(() => {
+  return suggestions.value.books.length + suggestions.value.authors.length
+})
+
+// ===== WATCH TÌM KIẾM =====
+watch(searchQuery, (newVal) => {
+  if (newVal && newVal.trim().length > 0) {
+    showSuggestions.value = true
+    selectedSuggestionIndex.value = -1
+  } else {
+    showSuggestions.value = false
+  }
+})
+
+// ===== TÌM KIẾM LOCAL =====
+const filteredBooks = computed(() => {
+  if (!searchQuery.value || searchQuery.value.trim() === '') {
+    return books.value
+  }
+
+  const query = searchQuery.value.toLowerCase().trim()
+  return books.value.filter(book => {
+    const tenSach = book.tenSach?.toLowerCase() || ''
+    const tacGia = book.tacGia?.toLowerCase() || ''
+    return tenSach.includes(query) || tacGia.includes(query)
+  })
+})
+
 // Tính số trang hiển thị trong pagination
 const pageNumbers = computed(() => {
   const pages = []
-  const maxVisible = 5 // Số trang hiển thị tối đa
-  
+  const maxVisible = 5
+
   let start = Math.max(0, currentPage.value - 2)
   let end = Math.min(totalPages.value - 1, start + maxVisible - 1)
-  
-  // Điều chỉnh start nếu end gần cuối
+
   if (end - start < maxVisible - 1) {
     start = Math.max(0, end - maxVisible + 1)
   }
-  
+
   for (let i = start; i <= end; i++) {
     pages.push(i)
   }
-  
+
   return pages
 })
 
-// ===== LOAD SÁCH VỚI PHÂN TRANG =====
-const loadBooks = async (page = 0) => {
+// ===== LOAD TẤT CẢ SÁCH ĐỂ TÌM KIẾM (1 LẦN DUY NHẤT) =====
+const loadAllBooks = async () => {
+  try {
+    const response = await api.get('/books', {
+      params: { page: 0, size: 1000 }
+    })
+    allBooks.value = response.data.content || response.data || []
+  } catch (error) {
+    console.error('Lỗi tải sách:', error)
+  }
+}
+
+// ===== ✅ LOAD SÁCH VỚI DEBOUNCE =====
+const loadBooks = async (page = 0, immediate = false) => {
+  // Hủy timer cũ nếu có
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+  }
+
+  // Nếu immediate = true, gọi API ngay lập tức (không debounce)
+  if (immediate) {
+    await fetchBooks(page)
+    return
+  }
+
+  // Debounce: Chờ 300ms sau lần gọi cuối cùng mới thực sự fetch
+  debounceTimer = setTimeout(async () => {
+    await fetchBooks(page)
+  }, 300)
+}
+
+// ===== FETCH BOOKS FROM API =====
+const fetchBooks = async (page = 0) => {
   try {
     loading.value = true
-    
-    // Gọi API với query params
+
     const response = await api.get('/books', {
       params: {
         page: page,
-        size: pageSize.value
+        size: pageSize.value,
+        sort: sortType.value
       }
     })
-    
+
     const data = response.data
-    
-    // Cập nhật dữ liệu
+
     books.value = data.content || []
     currentPage.value = data.currentPage
     totalPages.value = data.totalPages
     totalItems.value = data.totalItems
     hasNext.value = data.hasNext
     hasPrevious.value = data.hasPrevious
-    
-    // Scroll to top khi chuyển trang
+
     window.scrollTo({ top: 0, behavior: 'smooth' })
-    
+
   } catch (error) {
     console.error('Lỗi tải sách:', error)
     alert('Không thể tải danh sách sách')
@@ -84,25 +194,93 @@ const loadBooks = async (page = 0) => {
 // ===== ĐIỀU HƯỚNG TRANG =====
 const goToPage = (page) => {
   if (page >= 0 && page < totalPages.value) {
-    loadBooks(page)
+    loadBooks(page, true) // ✅ Chuyển trang KHÔNG debounce
   }
 }
 
 const previousPage = () => {
   if (hasPrevious.value) {
-    loadBooks(currentPage.value - 1)
+    loadBooks(currentPage.value - 1, true) // ✅ KHÔNG debounce
   }
 }
 
 const nextPage = () => {
   if (hasNext.value) {
-    loadBooks(currentPage.value + 1)
+    loadBooks(currentPage.value + 1, true) // ✅ KHÔNG debounce
   }
 }
 
+// ===== ✅ XỬ LÝ THAY ĐỔI SẮP XẾP (CÓ DEBOUNCE) =====
+const changeSort = () => {
+  console.log("Sort type:", sortType.value)
+  // Reset về trang đầu khi thay đổi cách sắp xếp
+  // ✅ SỬ DỤNG DEBOUNCE để tránh gọi API liên tục khi user thay đổi nhanh
+  loadBooks(0, false)
+}
+
+// ===== ✅ WATCH SORT TYPE (TỰ ĐỘNG GỌI API KHI THAY ĐỔI) =====
+watch(sortType, () => {
+  loadBooks(0, false) // ✅ Có debounce
+})
+
 // Load sách khi component mount
 onMounted(() => {
-  loadBooks()
+  loadBooks(0, true) // ✅ Lần đầu load KHÔNG debounce
+  loadAllBooks()
+})
+
+// ===== XỬ LÝ CHỌN GỢI Ý =====
+const selectSuggestion = (suggestion) => {
+  if (suggestion.type === 'book') {
+    searchQuery.value = suggestion.text
+  } else {
+    searchQuery.value = suggestion.text
+  }
+  showSuggestions.value = false
+  selectedSuggestionIndex.value = -1
+}
+
+// ===== XỬ LÝ BÀN PHÍM =====
+const handleKeyDown = (event) => {
+  if (!showSuggestions.value || totalSuggestions.value === 0) return
+
+  const allSuggestions = [
+    ...suggestions.value.books,
+    ...suggestions.value.authors
+  ]
+
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    selectedSuggestionIndex.value = Math.min(
+      selectedSuggestionIndex.value + 1,
+      totalSuggestions.value - 1
+    )
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    selectedSuggestionIndex.value = Math.max(
+      selectedSuggestionIndex.value - 1,
+      -1
+    )
+  } else if (event.key === 'Enter') {
+    event.preventDefault()
+    if (selectedSuggestionIndex.value >= 0) {
+      selectSuggestion(allSuggestions[selectedSuggestionIndex.value])
+    }
+  } else if (event.key === 'Escape') {
+    showSuggestions.value = false
+    selectedSuggestionIndex.value = -1
+  }
+}
+
+// ===== ĐÓNG GỢI Ý KHI CLICK BÊNN NGOÀI =====
+const handleClickOutside = (event) => {
+  if (searchInputRef.value && !searchInputRef.value.contains(event.target)) {
+    showSuggestions.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
 })
 
 // Yêu cầu đăng nhập trước khi xem chi tiết
@@ -127,38 +305,133 @@ const addToCart = (book) => {
   alert(`✅ Đã thêm "${book.tenSach}" vào giỏ hàng`)
 }
 
-const changeSort = () => {
-  // TODO: Xử lý sắp xếp sau
-  console.log("Sort type:", sortType.value)
+// ===== XÓA TÌM KIẾM =====
+const clearSearch = () => {
+  searchQuery.value = ''
+  showSuggestions.value = false
+  selectedSuggestionIndex.value = -1
+}
+
+// ===== HIGHLIGHT TEXT =====
+const highlightText = (text, query) => {
+  if (!query) return text
+  const regex = new RegExp(`(${query})`, 'gi')
+  return text.replace(regex, '<strong class="highlight">$1</strong>')
 }
 </script>
 
 <template>
+  <!-- TEMPLATE GIỮ NGUYÊN NHƯ TRƯỚC -->
   <div class="home-page">
-
-    <!-- GREETING -->
     <div class="greeting">
-      <h2>
-        📚 Chào mừng bạn đến BookStore
-      </h2>
+      <h2>📚 Chào mừng bạn đến BookStore</h2>
     </div>
 
     <div class="home-container">
-
-      <!-- LEFT: FILTER PANEL -->
       <div class="filter-panel">
         <h4>Danh mục</h4>
         <p>Chức năng lọc sẽ được thêm sau...</p>
       </div>
 
-      <!-- RIGHT: MAIN CONTENT -->
       <div class="main-content">
+        <!-- THANH TÌM KIẾM -->
+        <div class="search-bar" ref="searchInputRef">
+          <div class="search-input-wrapper">
+            <i class="fas fa-search search-icon"></i>
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="🔍 Tìm kiếm sách, tác giả..."
+              class="search-input"
+              @keydown="handleKeyDown"
+              @focus="searchQuery && (showSuggestions = true)"
+            />
+            <button
+              v-if="searchQuery"
+              @click="clearSearch"
+              class="clear-btn"
+              title="Xóa tìm kiếm"
+            >
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+
+          <!-- DROPDOWN GỢI Ý -->
+          <div v-if="showSuggestions && totalSuggestions > 0" class="suggestions-dropdown">
+            <div v-if="suggestions.books.length > 0" class="suggestion-group">
+              <div class="suggestion-header">
+                <i class="fas fa-book"></i>
+                <span>Sách</span>
+              </div>
+              <div
+                v-for="(book, index) in suggestions.books"
+                :key="'book-' + book.id"
+                class="suggestion-item"
+                :class="{
+                  active: index === selectedSuggestionIndex,
+                  'out-of-stock': book.stock === 0
+                }"
+                @click="selectSuggestion(book)"
+              >
+                <div class="suggestion-content">
+                  <i class="fas fa-book-open suggestion-icon"></i>
+                  <div class="suggestion-text">
+                    <div class="suggestion-title" v-html="highlightText(book.text, searchQuery)"></div>
+                    <div class="suggestion-meta">
+                      <span class="price">{{ book.price?.toLocaleString('vi-VN') }} đ</span>
+                      <span class="stock" :class="{ 'no-stock': book.stock === 0 }">
+                        {{ book.stock > 0 ? `Còn ${book.stock} cuốn` : 'Hết hàng' }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="suggestions.books.length > 0 && suggestions.authors.length > 0" class="suggestion-divider"></div>
+
+            <div v-if="suggestions.authors.length > 0" class="suggestion-group">
+              <div class="suggestion-header">
+                <i class="fas fa-user-edit"></i>
+                <span>Tác giả</span>
+              </div>
+              <div
+                v-for="(author, index) in suggestions.authors"
+                :key="'author-' + index"
+                class="suggestion-item"
+                :class="{ active: (suggestions.books.length + index) === selectedSuggestionIndex }"
+                @click="selectSuggestion(author)"
+              >
+                <div class="suggestion-content">
+                  <i class="fas fa-user suggestion-icon"></i>
+                  <div class="suggestion-text">
+                    <div class="suggestion-title" v-html="highlightText(author.text, searchQuery)"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else-if="showSuggestions && searchQuery && totalSuggestions === 0" class="suggestions-dropdown">
+            <div class="no-suggestions">
+              <i class="fas fa-search"></i>
+              <p>Không tìm thấy kết quả cho "<strong>{{ searchQuery }}</strong>"</p>
+            </div>
+          </div>
+
+          <div v-if="searchQuery && !showSuggestions" class="search-result-info">
+            <span class="result-count">
+              Tìm thấy <strong>{{ filteredBooks.length }}</strong> kết quả
+              cho "<strong>{{ searchQuery }}</strong>"
+            </span>
+          </div>
+        </div>
 
         <!-- SORT BAR -->
         <div class="sort-bar">
           <span>Sắp xếp theo:</span>
-          <select v-model="sortType" @change="changeSort">
-            <option value="all">Tất cả</option>
+          <select v-model="sortType">
+            <option value="all">Mặc định</option>
             <option value="priceAsc">Giá thấp → cao</option>
             <option value="priceDesc">Giá cao → thấp</option>
             <option value="bestSeller">Bán chạy</option>
@@ -174,21 +447,17 @@ const changeSort = () => {
 
         <!-- BOOK GRID -->
         <div v-else>
-          <div v-if="books.length > 0" class="grid">
-            <div class="book-card" v-for="b in books" :key="b.id">
+          <div v-if="filteredBooks.length > 0" class="grid">
+            <div class="book-card" v-for="b in filteredBooks" :key="b.id">
               <div class="book-image">📖</div>
-
               <h3>{{ b.tenSach }}</h3>
               <p class="author">Tác giả: {{ b.tacGia }}</p>
               <p class="price">{{ b.gia?.toLocaleString('vi-VN') }} đ</p>
               <p class="stock">Còn: {{ b.soLuong }} cuốn</p>
-
               <div class="actions">
                 <button @click="goDetail(b.id)" class="btn-detail">
                   <i class="fas fa-eye"></i> Chi tiết
                 </button>
-
-                <!-- CHỈ hiện nút "Thêm giỏ" nếu KHÔNG phải Admin -->
                 <button
                   @click="addToCart(b)"
                   class="btn-cart"
@@ -200,17 +469,22 @@ const changeSort = () => {
             </div>
           </div>
 
-          <!-- Empty state -->
+          <div v-else-if="searchQuery" class="empty-message">
+            <i class="fas fa-search" style="font-size: 48px; color: #95a5a6; margin-bottom: 15px;"></i>
+            <p>Không tìm thấy sách nào phù hợp với "<strong>{{ searchQuery }}</strong>"</p>
+            <button @click="clearSearch" class="btn-clear-search">
+              <i class="fas fa-times"></i> Xóa tìm kiếm
+            </button>
+          </div>
+
           <div v-else class="empty-message">
             <p>Chưa có sách nào trong hệ thống</p>
           </div>
 
-          <!-- ===== PHÂN TRANG ===== -->
-          <div v-if="totalPages > 1" class="pagination">
-            
-            <!-- Nút Previous -->
-            <button 
-              @click="previousPage" 
+          <!-- PHÂN TRANG -->
+          <div v-if="totalPages > 1 && !searchQuery" class="pagination">
+            <button
+              @click="previousPage"
               :disabled="!hasPrevious"
               class="page-btn"
               :class="{ disabled: !hasPrevious }"
@@ -218,8 +492,7 @@ const changeSort = () => {
               <i class="fas fa-chevron-left"></i> Trước
             </button>
 
-            <!-- Trang đầu -->
-            <button 
+            <button
               v-if="pageNumbers[0] > 0"
               @click="goToPage(0)"
               class="page-number"
@@ -227,10 +500,8 @@ const changeSort = () => {
               1
             </button>
 
-            <!-- Dấu ... -->
             <span v-if="pageNumbers[0] > 1" class="page-dots">...</span>
 
-            <!-- Các số trang -->
             <button
               v-for="page in pageNumbers"
               :key="page"
@@ -241,11 +512,9 @@ const changeSort = () => {
               {{ page + 1 }}
             </button>
 
-            <!-- Dấu ... -->
             <span v-if="pageNumbers[pageNumbers.length - 1] < totalPages - 2" class="page-dots">...</span>
 
-            <!-- Trang cuối -->
-            <button 
+            <button
               v-if="pageNumbers[pageNumbers.length - 1] < totalPages - 1"
               @click="goToPage(totalPages - 1)"
               class="page-number"
@@ -253,28 +522,23 @@ const changeSort = () => {
               {{ totalPages }}
             </button>
 
-            <!-- Nút Next -->
-            <button 
-              @click="nextPage" 
+            <button
+              @click="nextPage"
               :disabled="!hasNext"
               class="page-btn"
               :class="{ disabled: !hasNext }"
             >
               Sau <i class="fas fa-chevron-right"></i>
             </button>
-
           </div>
 
-          <!-- Thông tin phân trang -->
-          <div v-if="totalPages > 1" class="pagination-info">
-            Trang <strong>{{ currentPage + 1 }}</strong> / <strong>{{ totalPages }}</strong> 
+          <div v-if="totalPages > 1 && !searchQuery" class="pagination-info">
+            Trang <strong>{{ currentPage + 1 }}</strong> / <strong>{{ totalPages }}</strong>
             (Tổng: <strong>{{ totalItems }}</strong> sách)
           </div>
         </div>
-
       </div>
     </div>
-
   </div>
 </template>
 
@@ -291,16 +555,6 @@ const changeSort = () => {
 .greeting h2 {
   color: #2c3e50;
   margin-bottom: 10px;
-}
-
-.total-books {
-  color: #7f8c8d;
-  font-size: 16px;
-}
-
-.total-books strong {
-  color: #e74c3c;
-  font-size: 18px;
 }
 
 .home-container {
@@ -328,6 +582,210 @@ const changeSort = () => {
   width: 80%;
 }
 
+/* ===== THANH TÌM KIẾM AUTOCOMPLETE ===== */
+.search-bar {
+  position: relative;
+  margin-bottom: 20px;
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 15px;
+  color: #7f8c8d;
+  font-size: 16px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px 45px 12px 45px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  font-size: 15px;
+  transition: all 0.3s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.clear-btn {
+  position: absolute;
+  right: 10px;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.3s;
+  z-index: 1;
+}
+
+.clear-btn:hover {
+  background: #c0392b;
+  transform: scale(1.1);
+}
+
+/* ===== DROPDOWN GỢI Ý ===== */
+.suggestions-dropdown {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 20px;
+  right: 20px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.suggestion-group {
+  padding: 8px 0;
+}
+
+.suggestion-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  color: #7f8c8d;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: #f8f9fa;
+  border-bottom: 1px solid #ecf0f1;
+}
+
+.suggestion-header i {
+  font-size: 12px;
+}
+
+.suggestion-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+  border-bottom: 1px solid #f8f9fa;
+}
+
+.suggestion-item:hover,
+.suggestion-item.active {
+  background: #e8f4f8;
+}
+
+.suggestion-item.out-of-stock {
+  opacity: 0.6;
+}
+
+.suggestion-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.suggestion-icon {
+  color: #3498db;
+  font-size: 16px;
+  min-width: 20px;
+}
+
+.suggestion-text {
+  flex: 1;
+}
+
+.suggestion-title {
+  color: #2c3e50;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.suggestion-title :deep(.highlight) {
+  background: #fff3cd;
+  font-weight: 700;
+  color: #856404;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.suggestion-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.suggestion-meta .price {
+  color: #e74c3c;
+  font-weight: 600;
+}
+
+.suggestion-meta .stock {
+  color: #27ae60;
+}
+
+.suggestion-meta .stock.no-stock {
+  color: #e74c3c;
+}
+
+.suggestion-divider {
+  height: 1px;
+  background: #ecf0f1;
+  margin: 4px 0;
+}
+
+.no-suggestions {
+  padding: 40px 20px;
+  text-align: center;
+  color: #7f8c8d;
+}
+
+.no-suggestions i {
+  font-size: 32px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.no-suggestions p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.search-result-info {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: #e8f4f8;
+  border-left: 3px solid #3498db;
+  border-radius: 4px;
+}
+
+.result-count {
+  color: #2c3e50;
+  font-size: 14px;
+}
+
+.result-count strong {
+  color: #3498db;
+}
+
 /* SORT BAR */
 .sort-bar {
   margin-bottom: 20px;
@@ -339,10 +797,27 @@ const changeSort = () => {
   border-radius: 8px;
 }
 
+.sort-bar span {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
 .sort-bar select {
   padding: 8px 12px;
-  border: 1px solid #ddd;
+  border: 2px solid #ddd;
   border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.sort-bar select:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.sort-bar select:hover {
+  border-color: #3498db;
 }
 
 /* LOADING */
@@ -462,7 +937,7 @@ const changeSort = () => {
 
 .empty-message {
   text-align: center;
-  padding: 50px;
+  padding: 60px 20px;
   background: white;
   border-radius: 8px;
 }
@@ -470,6 +945,22 @@ const changeSort = () => {
 .empty-message p {
   font-size: 18px;
   color: #7f8c8d;
+  margin-bottom: 20px;
+}
+
+.btn-clear-search {
+  padding: 10px 20px;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.3s;
+}
+
+.btn-clear-search:hover {
+  background: #c0392b;
 }
 
 /* ===== PHÂN TRANG ===== */
@@ -544,24 +1035,52 @@ const changeSort = () => {
   .home-container {
     flex-direction: column;
   }
-  
+
   .filter-panel,
   .main-content {
     width: 100%;
   }
-  
+
   .grid {
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   }
-  
+
   .pagination {
     gap: 5px;
   }
-  
+
   .page-btn,
   .page-number {
     padding: 8px 12px;
     font-size: 14px;
   }
+
+  .search-input {
+    font-size: 14px;
+  }
+
+  .suggestions-dropdown {
+    left: 10px;
+    right: 10px;
+  }
+}
+
+/* Scrollbar cho dropdown */
+.suggestions-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.suggestions-dropdown::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.suggestions-dropdown::-webkit-scrollbar-thumb {
+  background: #bdc3c7;
+  border-radius: 4px;
+}
+
+.suggestions-dropdown::-webkit-scrollbar-thumb:hover {
+  background: #95a5a6;
 }
 </style>

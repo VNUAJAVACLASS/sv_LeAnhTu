@@ -20,52 +20,51 @@ import java.util.Map;
 @RequestMapping("/api/books")
 @CrossOrigin(origins = "*", maxAge = 3600)
 public class BookController {
-    
+
     @Autowired
     private BookService bookService;
 
     /**
-     *  Lấy danh sách sách có phân trang
-     * GET /api/books?page=0&size=10
-     * 
+     * Lấy danh sách sách có phân trang và sắp xếp
+     * GET /api/books?page=0&size=10&sort=priceAsc
+     *
      * @param page - Số trang (bắt đầu từ 0)
      * @param size - Số sách mỗi trang (mặc định 10)
+     * @param sort - Loại sắp xếp: all, priceAsc, priceDesc, bestSeller, newest
      * @return Page<Book> với thông tin phân trang
      */
     @GetMapping
     public ResponseEntity<?> getAllBooks(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "all") String sort
     ) {
         try {
-            // Tạo Pageable với sắp xếp theo id giảm dần (sách mới nhất trước)
+            // Tạo Pageable với sắp xếp theo id giảm dần (mặc định)
             Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
-            
-            // Lấy dữ liệu phân trang
-            Page<Book> bookPage = bookService.findAll(pageable);
-            
+
+            // Lấy dữ liệu phân trang với loại sắp xếp
+            Page<Book> bookPage = bookService.findAll(pageable, sort);
+
             // Tạo response với đầy đủ thông tin phân trang
             Map<String, Object> response = new HashMap<>();
-            response.put("content", bookPage.getContent());           // Danh sách sách
-            response.put("currentPage", bookPage.getNumber());        // Trang hiện tại (0-indexed)
-            response.put("totalItems", bookPage.getTotalElements());  // Tổng số sách
-            response.put("totalPages", bookPage.getTotalPages());     // Tổng số trang
-            response.put("pageSize", bookPage.getSize());             // Số sách mỗi trang
-            response.put("hasNext", bookPage.hasNext());              // Có trang tiếp theo?
-            response.put("hasPrevious", bookPage.hasPrevious());      // Có trang trước?
-            response.put("isFirst", bookPage.isFirst());              // Trang đầu tiên?
-            response.put("isLast", bookPage.isLast());                // Trang cuối cùng?
-            
+            response.put("content", bookPage.getContent());
+            response.put("currentPage", bookPage.getNumber());
+            response.put("totalItems", bookPage.getTotalElements());
+            response.put("totalPages", bookPage.getTotalPages());
+            response.put("pageSize", bookPage.getSize());
+            response.put("hasNext", bookPage.hasNext());
+            response.put("hasPrevious", bookPage.hasPrevious());
+            response.put("isFirst", bookPage.isFirst());
+            response.put("isLast", bookPage.isLast());
+            response.put("sortType", sort); // Trả về loại sắp xếp hiện tại
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Lỗi: " + e.getMessage());
         }
     }
 
-    /**
-     * Lấy thông tin chi tiết sách theo ID
-     * GET /api/books/{id}
-     */
     @GetMapping("/{id}")
     public ResponseEntity<?> getBookById(@PathVariable Long id) {
         try {
@@ -76,17 +75,13 @@ public class BookController {
         }
     }
 
-    /**
-     * Tạo sách mới (chỉ admin)
-     * POST /api/books
-     */
     @PostMapping
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<?> createBook(@RequestBody Book book) {
         try {
             String username = SecurityContextHolder.getContext().getAuthentication().getName();
             book.setCreatedBy(username);
-            
+
             Book savedBook = bookService.save(book);
             return ResponseEntity.ok(savedBook);
         } catch (Exception e) {
@@ -94,10 +89,6 @@ public class BookController {
         }
     }
 
-    /**
-     * Cập nhật sách (chỉ admin)
-     * PATCH /api/books/{id}
-     */
     @PatchMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<?> updateBook(@PathVariable Long id, @RequestBody Book updatedBook) {
@@ -110,10 +101,6 @@ public class BookController {
         }
     }
 
-    /**
-     * Xóa sách (chỉ admin)
-     * DELETE /api/books/{id}
-     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
     public ResponseEntity<?> deleteBook(@PathVariable Long id) {

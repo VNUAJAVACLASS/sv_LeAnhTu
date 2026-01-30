@@ -14,25 +14,39 @@ public class BookService {
     private BookRepository bookRepository;
 
     /**
-     * Lấy danh sách sách có phân trang
-     * @param pageable - Thông tin phân trang (page, size, sort)
-     * @return Page<Book> - Kết quả phân trang
+     * Lấy danh sách sách có phân trang và sắp xếp
+     * @param pageable - Thông tin phân trang
+     * @param sortType - Loại sắp xếp: all, priceAsc, priceDesc, bestSeller, newest
+     * @return Page<Book>
      */
+    public Page<Book> findAll(Pageable pageable, String sortType) {
+        if (sortType == null || sortType.equals("all")) {
+            return bookRepository.findAll(pageable);
+        }
+        
+        switch (sortType) {
+            case "priceAsc":
+                return bookRepository.findAllByOrderByGiaAsc(pageable);
+            case "priceDesc":
+                return bookRepository.findAllByOrderByGiaDesc(pageable);
+            case "bestSeller":
+                return bookRepository.findAllOrderByBestSelling(pageable);
+            case "newest":
+                return bookRepository.findAllByOrderByNgayThemDesc(pageable);
+            default:
+                return bookRepository.findAll(pageable);
+        }
+    }
+
     public Page<Book> findAll(Pageable pageable) {
         return bookRepository.findAll(pageable);
     }
 
-    /**
-     * Lấy sách theo ID
-     */
     public Book findById(Long id) {
         return bookRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sách không tồn tại"));
     }
 
-    /**
-     * Tạo sách mới
-     */
     public Book save(Book book) {
         if (book.getNgayThem() == null) {
             book.setNgayThem(LocalDate.now());
@@ -40,13 +54,10 @@ public class BookService {
         return bookRepository.save(book);
     }
 
-    /**
-     * Cập nhật sách
-     */
     public Book update(Long id, Book updatedBook, String updatedBy) {
         Book existing = bookRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sách không tồn tại"));
-        
+
         existing.setTenSach(updatedBook.getTenSach());
         existing.setMoTa(updatedBook.getMoTa());
         existing.setTacGia(updatedBook.getTacGia());
@@ -54,13 +65,10 @@ public class BookService {
         existing.setImagePath(updatedBook.getImagePath());
         existing.setSoLuong(updatedBook.getSoLuong());
         existing.setUpdatedBy(updatedBy);
-        
+
         return bookRepository.save(existing);
     }
 
-    /**
-     * Xóa sách
-     */
     public void delete(Long id) {
         if (!bookRepository.existsById(id)) {
             throw new RuntimeException("Sách không tồn tại");

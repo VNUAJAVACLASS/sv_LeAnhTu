@@ -1,11 +1,15 @@
 package vnua.fita.tthieu.springboot.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import vnua.fita.tthieu.springboot.entity.Book;
 import vnua.fita.tthieu.springboot.repository.BookRepository;
+import vnua.fita.tthieu.springboot.repository.DanhMucRepository;
+import vnua.fita.tthieu.springboot.entity.DanhMuc;
+import vnua.fita.tthieu.springboot.repository.DanhMucRepository;
 import java.time.LocalDate;
 
 @Service
@@ -13,28 +17,36 @@ public class BookService {
     @Autowired
     private BookRepository bookRepository;
 
+    @Autowired
+    private DanhMucRepository danhMucRepository;
+    
     /**
      * Lấy danh sách sách có phân trang và sắp xếp
      * @param pageable - Thông tin phân trang
      * @param sortType - Loại sắp xếp: all, priceAsc, priceDesc, bestSeller, newest
      * @return Page<Book>
      */
-    public Page<Book> findAll(Pageable pageable, String sortType) {
-        if (sortType == null || sortType.equals("all")) {
-            return bookRepository.findAll(pageable);
+    public Page<Book> findAll(Pageable pageable, String sortType, Long danhMucId) {
+        boolean hasDanhMuc = danhMucId != null;
+
+        if (sortType == null) sortType = "all";
+
+        if (hasDanhMuc) {
+            switch (sortType) {
+                case "priceAsc":    return bookRepository.findByDanhMucIdOrderByGiaAsc(danhMucId, pageable);
+                case "priceDesc":   return bookRepository.findByDanhMucIdOrderByGiaDesc(danhMucId, pageable);
+                case "bestSeller":  return bookRepository.findByDanhMucIdOrderByBestSelling(danhMucId, pageable);
+                case "newest":      return bookRepository.findByDanhMucIdOrderByNgayThemDesc(danhMucId, pageable);
+                default:            return bookRepository.findByDanhMucId(danhMucId, pageable);
+            }
         }
-        
+
         switch (sortType) {
-            case "priceAsc":
-                return bookRepository.findAllByOrderByGiaAsc(pageable);
-            case "priceDesc":
-                return bookRepository.findAllByOrderByGiaDesc(pageable);
-            case "bestSeller":
-                return bookRepository.findAllOrderByBestSelling(pageable);
-            case "newest":
-                return bookRepository.findAllByOrderByNgayThemDesc(pageable);
-            default:
-                return bookRepository.findAll(pageable);
+            case "priceAsc":    return bookRepository.findAllByOrderByGiaAsc(pageable);
+            case "priceDesc":   return bookRepository.findAllByOrderByGiaDesc(pageable);
+            case "bestSeller":  return bookRepository.findAllOrderByBestSelling(pageable);
+            case "newest":      return bookRepository.findAllByOrderByNgayThemDesc(pageable);
+            default:            return bookRepository.findAll(pageable);
         }
     }
 

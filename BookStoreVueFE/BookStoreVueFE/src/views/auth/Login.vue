@@ -74,6 +74,7 @@ const submit = async () => {
           v-model="password"
           type="password"
           placeholder="Mật khẩu (5–20 ký tự)"
+          maxlength="20"
           @keyup.enter="submit"
         />
       </div>

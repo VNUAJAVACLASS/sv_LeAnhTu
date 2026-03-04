@@ -1,6 +1,7 @@
 package vnua.fita.tthieu.springboot.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -24,6 +25,9 @@ public class BookController {
     @Autowired
     private BookService bookService;
 
+    @Autowired
+    private vnua.fita.tthieu.springboot.repository.DanhMucRepository danhMucRepository;
+
     /**
      * Lấy danh sách sách có phân trang và sắp xếp
      * GET /api/books?page=0&size=10&sort=priceAsc
@@ -37,16 +41,13 @@ public class BookController {
     public ResponseEntity<?> getAllBooks(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "all") String sort
+            @RequestParam(defaultValue = "all") String sort,
+            @RequestParam(required = false) Long danhMucId
     ) {
         try {
-            // Tạo Pageable với sắp xếp theo id giảm dần (mặc định)
             Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+            Page<Book> bookPage = bookService.findAll(pageable, sort, danhMucId);
 
-            // Lấy dữ liệu phân trang với loại sắp xếp
-            Page<Book> bookPage = bookService.findAll(pageable, sort);
-
-            // Tạo response với đầy đủ thông tin phân trang
             Map<String, Object> response = new HashMap<>();
             response.put("content", bookPage.getContent());
             response.put("currentPage", bookPage.getNumber());
@@ -57,7 +58,8 @@ public class BookController {
             response.put("hasPrevious", bookPage.hasPrevious());
             response.put("isFirst", bookPage.isFirst());
             response.put("isLast", bookPage.isLast());
-            response.put("sortType", sort); // Trả về loại sắp xếp hiện tại
+            response.put("sortType", sort);
+            response.put("danhMucId", danhMucId);
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -77,13 +79,43 @@ public class BookController {
 
     @PostMapping
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
-    public ResponseEntity<?> createBook(@RequestBody Book book) {
+    public ResponseEntity<?> createBook(@RequestBody Map<String, Object> bookData) {
         try {
             String username = SecurityContextHolder.getContext().getAuthentication().getName();
+
+            Book book = new Book();
+            book.setTenSach((String) bookData.get("tenSach"));
+            book.setTacGia((String) bookData.get("tacGia"));
+            book.setMoTa((String) bookData.get("moTa"));
+            book.setImagePath((String) bookData.get("imagePath"));
             book.setCreatedBy(username);
 
-            Book savedBook = bookService.save(book);
-            return ResponseEntity.ok(savedBook);
+            if (bookData.get("gia") != null)
+                book.setGia(Double.parseDouble(bookData.get("gia").toString()));
+            if (bookData.get("soLuong") != null)
+                book.setSoLuong(Integer.parseInt(bookData.get("soLuong").toString()));
+
+            // Xử lý danh mục
+            if (bookData.get("danhMucId") != null) {
+                Long danhMucId = Long.parseLong(bookData.get("danhMucId").toString());
+                danhMucRepository.findById(danhMucId).ifPresent(book::setDanhMuc);
+            } else if (bookData.get("tenDanhMucMoi") != null && !bookData.get("tenDanhMucMoi").toString().isBlank()) {
+                String tenMoi = bookData.get("tenDanhMucMoi").toString().trim();
+                vnua.fita.tthieu.springboot.entity.DanhMuc dm = danhMucRepository.findAll()
+                    .stream().filter(d -> d.getTenDanhMuc().equalsIgnoreCase(tenMoi)).findFirst()
+                    .orElseGet(() -> {
+                        vnua.fita.tthieu.springboot.entity.DanhMuc newDm = new vnua.fita.tthieu.springboot.entity.DanhMuc();
+                        newDm.setTenDanhMuc(tenMoi);
+                        newDm.setIcon("📚");
+                        newDm.setMauSac("#95a5a6");
+                        newDm.setThuTu(99);
+                        return danhMucRepository.save(newDm);
+                    });
+                book.setDanhMuc(dm);
+            }
+
+            Book saved = bookService.save(book);
+            return ResponseEntity.ok(saved);
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Lỗi: " + e.getMessage());
         }
@@ -91,11 +123,38 @@ public class BookController {
 
     @PatchMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN')")
-    public ResponseEntity<?> updateBook(@PathVariable Long id, @RequestBody Book updatedBook) {
+    public ResponseEntity<?> updateBook(@PathVariable Long id, @RequestBody Map<String, Object> bookData) {
         try {
             String username = SecurityContextHolder.getContext().getAuthentication().getName();
-            Book book = bookService.update(id, updatedBook, username);
-            return ResponseEntity.ok(book);
+            Book existing = bookService.findById(id);
+
+            if (bookData.get("tenSach") != null) existing.setTenSach((String) bookData.get("tenSach"));
+            if (bookData.get("tacGia") != null) existing.setTacGia((String) bookData.get("tacGia"));
+            if (bookData.get("moTa") != null) existing.setMoTa((String) bookData.get("moTa"));
+            if (bookData.get("imagePath") != null) existing.setImagePath((String) bookData.get("imagePath"));
+            if (bookData.get("gia") != null) existing.setGia(Double.parseDouble(bookData.get("gia").toString()));
+            if (bookData.get("soLuong") != null) existing.setSoLuong(Integer.parseInt(bookData.get("soLuong").toString()));
+            existing.setUpdatedBy(username);
+
+            if (bookData.get("danhMucId") != null) {
+                Long danhMucId = Long.parseLong(bookData.get("danhMucId").toString());
+                danhMucRepository.findById(danhMucId).ifPresent(existing::setDanhMuc);
+            } else if (bookData.get("tenDanhMucMoi") != null && !bookData.get("tenDanhMucMoi").toString().isBlank()) {
+                String tenMoi = bookData.get("tenDanhMucMoi").toString().trim();
+                vnua.fita.tthieu.springboot.entity.DanhMuc dm = danhMucRepository.findAll()
+                    .stream().filter(d -> d.getTenDanhMuc().equalsIgnoreCase(tenMoi)).findFirst()
+                    .orElseGet(() -> {
+                        vnua.fita.tthieu.springboot.entity.DanhMuc newDm = new vnua.fita.tthieu.springboot.entity.DanhMuc();
+                        newDm.setTenDanhMuc(tenMoi);
+                        newDm.setIcon("📚");
+                        newDm.setMauSac("#95a5a6");
+                        newDm.setThuTu(99);
+                        return danhMucRepository.save(newDm);
+                    });
+                existing.setDanhMuc(dm);
+            }
+
+            return ResponseEntity.ok(bookService.save(existing));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }

@@ -1,6 +1,6 @@
 <template>
   <footer class="footer">
-    <p>© 2025 - Thiết kế bởi <strong>{{ author }}</strong></p>
+    <p> 2025 - Tài liệu ở: <strong>{{ author }}</strong></p>
   </footer>
 </template>
 

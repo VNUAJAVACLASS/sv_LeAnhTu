@@ -1,6 +1,7 @@
 package vnua.fita.tthieu.springboot.entity;
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.LocalDate;
 
 @Entity
@@ -17,24 +18,35 @@ public class Book {
     @Column(length = 1000)
     private String moTa;
 
+    @Column(length = 100)
     private String tacGia;
 
     @Column(nullable = false)
     private Double gia;
 
+    @Column(length = 255)
     private String imagePath;
 
+    
     private LocalDate ngayThem;
 
     @Column(nullable = false)
     private Integer soLuong;
 
     // Người tạo
+    @Column(length = 100)
     private String createdBy;
-
+    
+    @Column(length = 100)
     // Người sửa gần nhất
     private String updatedBy;
 
+    //Danh mục
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "danh_muc_id", nullable = true)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private DanhMuc danhMuc;
+    
     // Constructors ko tham số
     public Book() {}
 
@@ -129,4 +141,8 @@ public class Book {
     public void setUpdatedBy(String updatedBy) {
         this.updatedBy = updatedBy;
     }
+    
+    public DanhMuc getDanhMuc() { return danhMuc; }
+    public void setDanhMuc(DanhMuc danhMuc) { this.danhMuc = danhMuc; }
+    
 }

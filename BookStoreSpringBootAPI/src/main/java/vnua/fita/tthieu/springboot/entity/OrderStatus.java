@@ -20,7 +20,7 @@ public class OrderStatus {
 
 
     // ===== INFO =====
-    @Column(name = "so_dien_thoai_user")
+    @Column(name = "so_dien_thoai_user", length = 15)
     private String soDienThoaiUser;
 
     @Column(name = "ngay_dat")

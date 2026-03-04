@@ -25,7 +25,7 @@ public class OrderHistory {
 	    // Không ràng buộc với book, chỉ lưu bookId
 	    private Long bookId;
 
-	    @Column(nullable = false)
+	    @Column(nullable = false, length = 100)
 	    private String tenSach;
 
 	    @Column(nullable = false)

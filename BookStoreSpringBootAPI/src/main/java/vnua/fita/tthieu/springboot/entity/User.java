@@ -11,19 +11,20 @@ public class User {
     private Long id;
     
     // ko được trùng, ko được để trống trường này
-    @Column(unique = true, nullable = false) 
+    @Column(unique = true, nullable = false,length = 32) 
     private String username;  
 
-    @Column(unique = true)
+    @Column(unique = true,length = 50)
     private String gmail;
     
     // Dùng String để tránh mất số 0 đầu
-    @Column(unique = true)
+    @Column(unique = true,length = 15)
     private String soDienThoai;
     
-    @Column(nullable = false)
+    @Column(nullable = false,length = 20)
     private String password;
     
+    @Column(length = 255)
     private String diaChi;
     
     // Quan hệ nhiều nhiều giữa 2 entity User - Role, bảng user_roles cũng được tự động sinh

@@ -70,8 +70,8 @@ public class SecurityConfig {
             .requestMatchers("/api/auth/**").permitAll() // CN login, register ko cần xác thực
             .requestMatchers(HttpMethod.GET, "/api/projects/**").permitAll()  // CN xem không cần xác thực
             .requestMatchers(HttpMethod.GET, "/api/books/**").permitAll() // CN xem k cần xác thực sách
+            .requestMatchers(HttpMethod.GET, "/api/danh-muc/**").permitAll()
             .anyRequest().authenticated() // Kiểm tra trạng thái đã xác thực trong SecurityContextHolder
-           
         )
         // Dùng jwtToken nên ko dùng session
         .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

@@ -1,9 +1,12 @@
 package vnua.fita.tthieu.springboot.repository;
 
 import org.springframework.data.domain.Page;
+
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
 import vnua.fita.tthieu.springboot.entity.Book;
 
 public interface BookRepository extends JpaRepository<Book, Long> {
@@ -23,4 +26,18 @@ public interface BookRepository extends JpaRepository<Book, Long> {
            "GROUP BY b.id " +
            "ORDER BY COALESCE(SUM(oh.soLuong), 0) DESC")
     Page<Book> findAllOrderByBestSelling(Pageable pageable);
+    
+    //==============================
+    //Danh mục
+    Page<Book> findByDanhMucId(Long danhMucId, Pageable pageable);
+
+    @Query("SELECT b FROM Book b LEFT JOIN OrderHistory oh ON b.id = oh.bookId " +
+           "WHERE b.danhMuc.id = :danhMucId " +
+           "GROUP BY b.id ORDER BY COALESCE(SUM(oh.soLuong), 0) DESC")
+    Page<Book> findByDanhMucIdOrderByBestSelling(@Param("danhMucId") Long danhMucId, Pageable pageable);
+
+    Page<Book> findByDanhMucIdOrderByGiaAsc(Long danhMucId, Pageable pageable);
+    Page<Book> findByDanhMucIdOrderByGiaDesc(Long danhMucId, Pageable pageable);
+    Page<Book> findByDanhMucIdOrderByNgayThemDesc(Long danhMucId, Pageable pageable);
+    
 }
